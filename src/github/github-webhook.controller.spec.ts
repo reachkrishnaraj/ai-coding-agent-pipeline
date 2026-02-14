@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
 import { GitHubWebhookController } from './github-webhook.controller';
+import { PrismaService } from '../prisma/prisma.service';
+import { SlackNotificationService } from '../slack/slack-notification.service';
 import * as crypto from 'crypto';
 
 describe('GitHubWebhookController', () => {
@@ -19,6 +21,24 @@ describe('GitHubWebhookController', () => {
               if (key === 'GITHUB_WEBHOOK_SECRET') return webhookSecret;
               return null;
             }),
+          },
+        },
+        {
+          provide: PrismaService,
+          useValue: {
+            task: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              update: jest.fn().mockResolvedValue({}),
+            },
+          },
+        },
+        {
+          provide: SlackNotificationService,
+          useValue: {
+            notifyPROpened: jest.fn().mockResolvedValue(undefined),
+            notifyPRMerged: jest.fn().mockResolvedValue(undefined),
+            notifyPRClosed: jest.fn().mockResolvedValue(undefined),
+            notifyAgentQuestion: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],

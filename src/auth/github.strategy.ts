@@ -17,8 +17,8 @@ export interface GitHubUser {
 export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
   constructor(private readonly configService: ConfigService) {
     super({
-      clientID: configService.get<string>('GITHUB_OAUTH_CLIENT_ID'),
-      clientSecret: configService.get<string>('GITHUB_OAUTH_CLIENT_SECRET'),
+      clientID: configService.get<string>('GITHUB_OAUTH_CLIENT_ID') || '',
+      clientSecret: configService.get<string>('GITHUB_OAUTH_CLIENT_SECRET') || '',
       callbackURL: configService.get<string>('GITHUB_OAUTH_CALLBACK_URL') || 'http://localhost:3000/api/auth/github/callback',
       scope: ['read:user', 'read:org'],
     });

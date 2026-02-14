@@ -39,7 +39,10 @@
       "WebFetch(domain:platform.openai.com)",
       "WebFetch(domain:api.slack.com)",
       "WebFetch(domain:railway.docs.com)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(open:*)",
+      "Bash(jq:*)",
+      "Bash(git ls-tree:*)"
     ]
   }
 }

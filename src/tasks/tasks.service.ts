@@ -9,18 +9,24 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { ClarifyTaskDto } from './dto/clarify-task.dto';
 import { TaskQueryDto } from './dto/task-query.dto';
-import { ILlmService } from '../common/interfaces/llm.service.interface';
-import { IGitHubService } from '../common/interfaces/github.service.interface';
+import type { ILlmService } from '../common/interfaces/llm.service.interface';
+import type { IGitHubService } from '../common/interfaces/github.service.interface';
 import { TaskStatus } from '@prisma/client';
 
 @Injectable()
 export class TasksService {
+  private readonly llmService: ILlmService;
+  private readonly githubService: IGitHubService;
+
   constructor(
     private readonly prisma: PrismaService,
-    @Inject('ILlmService') private readonly llmService: ILlmService,
-    @Inject('IGitHubService') private readonly githubService: IGitHubService,
+    @Inject('ILlmService') llmService: any,
+    @Inject('IGitHubService') githubService: any,
     @Optional() @Inject('SlackNotificationService') private readonly slackNotificationService?: any,
-  ) {}
+  ) {
+    this.llmService = llmService;
+    this.githubService = githubService;
+  }
 
   // State machine: valid transitions
   private readonly validTransitions: Record<TaskStatus, TaskStatus[]> = {
@@ -188,10 +194,10 @@ export class TasksService {
     try {
       const analysis = await this.llmService.analyzeTask({
         description: task.description,
-        task_type_hint: task.taskTypeHint,
-        repo: task.repo,
-        files_hint: task.filesHint,
-        acceptance_criteria: task.acceptanceCriteria,
+        task_type_hint: task.taskTypeHint ?? undefined,
+        repo: task.repo ?? undefined,
+        files_hint: task.filesHint ?? undefined,
+        acceptance_criteria: task.acceptanceCriteria ?? undefined,
         clarificationQA,
       });
 
@@ -240,10 +246,10 @@ export class TasksService {
       {
         id: task.id,
         description: task.description,
-        repo: task.repo,
-        acceptance_criteria: task.acceptanceCriteria,
-        clarificationQuestions: task.clarificationQuestions as string[],
-        clarificationAnswers: task.clarificationAnswers as string[],
+        repo: task.repo ?? 'mothership/unknown',
+        acceptance_criteria: task.acceptanceCriteria ?? undefined,
+        clarificationQuestions: (task.clarificationQuestions as string[]) ?? undefined,
+        clarificationAnswers: (task.clarificationAnswers as string[]) ?? undefined,
       },
       analysis,
     );
@@ -353,13 +359,13 @@ export class TasksService {
     // Re-run the analysis flow
     return this.create({
       description: task.description,
-      type: task.taskTypeHint,
-      repo: task.repo,
-      files: task.filesHint,
-      acceptanceCriteria: task.acceptanceCriteria,
-      priority: task.priority,
-      source: task.source,
-      createdBy: task.createdBy,
+      type: task.taskTypeHint ?? undefined,
+      repo: task.repo ?? undefined,
+      files: task.filesHint ?? undefined,
+      acceptanceCriteria: task.acceptanceCriteria ?? undefined,
+      priority: (task.priority as 'normal' | 'urgent') ?? undefined,
+      source: task.source ?? undefined,
+      createdBy: task.createdBy ?? undefined,
     });
   }
 
@@ -373,7 +379,7 @@ export class TasksService {
     }
 
     // Can only cancel if not yet dispatched
-    const cancellableStatuses = [
+    const cancellableStatuses: TaskStatus[] = [
       TaskStatus.received,
       TaskStatus.analyzing,
       TaskStatus.needs_clarification,

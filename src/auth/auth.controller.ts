@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard as PassportAuthGuard } from '@nestjs/passport';
-import { Request, Response } from 'express';
-import { GitHubUser } from './github.strategy';
+import type { Request, Response } from 'express';
+import type { GitHubUser } from './github.strategy';
 
 @Controller('api/auth')
 export class AuthController {
