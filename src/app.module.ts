@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { TasksModule } from './tasks/tasks.module';
 import { AuthModule } from './auth/auth.module';
+import { SlackModule } from './slack/slack.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AuthModule } from './auth/auth.module';
     PrismaModule,
     TasksModule,
     AuthModule,
+    SlackModule,
   ],
   controllers: [AppController],
   providers: [AppService],
