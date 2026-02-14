@@ -1,14 +1,92 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum TaskStatus {
+  received
+  analyzing
+  needs_clarification
+  dispatched
+  coding
+  pr_open
+  merged
+  failed
+}
+
+model Task {
+  id        String   @id @default(uuid())
+  source    String   // 'web' | 'slack' | 'api' | 'asana'
+  status    TaskStatus @default(received)
+
+  // User input
+  description         String
+  taskTypeHint        String?   @map("task_type_hint")
+  repo                String    @default("mothership/finance-service")
+  filesHint           String?   @map("files_hint")
+  acceptanceCriteria  String?   @map("acceptance_criteria")
+  priority            String    @default("normal")
+
+  // LLM analysis
+  llmAnalysis         Json?     @map("llm_analysis")
+  llmSummary          String?   @map("llm_summary")
+  taskType            String?   @map("task_type")
+  recommendedAgent    String?   @map("recommended_agent")
+  likelyFiles         Json?     @map("likely_files")
+  suggestedCriteria   Json?     @map("suggested_criteria")
+
+  // Clarification
+  clarificationQuestions  Json?     @map("clarification_questions")
+  clarificationAnswers    Json?     @map("clarification_answers")
+  isClarified             Boolean   @default(false) @map("is_clarified")
+
+  // GitHub
+  githubIssueNumber   Int?      @map("github_issue_number")
+  githubIssueUrl      String?   @map("github_issue_url")
+  githubPrNumber      Int?      @map("github_pr_number")
+  githubPrUrl         String?   @map("github_pr_url")
+  githubPrStatus      String?   @map("github_pr_status")
+  githubBranch        String?   @map("github_branch")
+
+  // Slack
+  slackUserId         String?   @map("slack_user_id")
+  slackChannelId      String?   @map("slack_channel_id")
+  slackThreadTs       String?   @map("slack_thread_ts")
+
+  // Meta
+  createdBy       String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  dispatchedAt    DateTime? @map("dispatched_at")
+  completedAt     DateTime? @map("completed_at")
+  errorMessage    String?   @map("error_message")
+
+  // Relations
+  events          TaskEvent[]
+
+  @@index([status])
+  @@index([repo])
+  @@index([createdAt(sort: Desc)])
+  @@index([githubIssueNumber])
+  @@map("tasks")
+}
+
+model TaskEvent {
+  id          String   @id @default(uuid())
+  taskId      String   @map("task_id")
+  eventType   String   @map("event_type")
+  payload     Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("task_events")
 }
