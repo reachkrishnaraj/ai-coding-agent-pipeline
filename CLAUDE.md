@@ -7,10 +7,10 @@ A cloud-hosted service that manages the full lifecycle of AI coding tasks: intak
 Read `SPEC.md` for the complete V2.1 specification. Read `MASTER-AGENT-PLAN.md` for the build plan with per-session prompts.
 
 ## Tech Stack
-- **Backend:** NestJS 11, TypeScript 5, Prisma 6, PostgreSQL 16
+- **Backend:** NestJS 11, TypeScript 5, Mongoose 8, MongoDB 7
 - **Frontend:** React + Vite + Tailwind CSS (in `/web`)
 - **Package Manager:** pnpm
-- **Hosting:** Railway (container + managed Postgres)
+- **Hosting:** Railway (container + MongoDB Atlas or Railway MongoDB plugin)
 - **LLM:** OpenAI gpt-4o (chat completions API)
 - **Auth:** GitHub OAuth (mothership org members only)
 
@@ -24,14 +24,14 @@ src/
   github/       # Issue creation, webhook handling
   slack/        # Slash commands, DM notifications
   auth/         # GitHub OAuth, session, guards
-  common/       # Shared interfaces, config, filters
+  common/       # Shared interfaces, config, filters, schemas
+  database/     # MongoDB connection module
 web/            # React frontend (Vite + Tailwind)
-prisma/         # Schema and migrations
 ```
 
 ### Code Style
 - Follow NestJS module structure: module → controller → service → dto
-- Use Prisma for ALL database access (never raw SQL)
+- Use Mongoose for ALL database access (never raw MongoDB driver calls)
 - Use `class-validator` decorators for DTO validation
 - Use `@nestjs/config` for environment variables — NEVER hardcode secrets
 - All API routes under `/api/*`
@@ -54,7 +54,7 @@ prisma/         # Schema and migrations
 
 ### Environment Variables
 All secrets must come from environment variables. See `.env.example` for the full list.
-Required: DATABASE_URL, OPENAI_API_KEY, GITHUB_TOKEN, GITHUB_WEBHOOK_SECRET, SESSION_SECRET
+Required: MONGODB_URI, OPENAI_API_KEY, GITHUB_TOKEN, GITHUB_WEBHOOK_SECRET, SESSION_SECRET
 Optional: SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET
 
 ### Security Rules

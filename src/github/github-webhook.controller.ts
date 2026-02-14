@@ -8,9 +8,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../prisma/prisma.service';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Task, TaskDocument } from '../common/schemas/task.schema';
+import { TaskStatus } from '../common/enums/task-status.enum';
 import { SlackNotificationService } from '../slack/slack-notification.service';
-import { TaskStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 
 interface WebhookPayload {
@@ -47,7 +49,7 @@ export class GitHubWebhookController {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService,
+    @InjectModel(Task.name) private taskModel: Model<TaskDocument>,
     private readonly slackNotificationService: SlackNotificationService,
   ) {
     this.webhookSecret =
@@ -115,12 +117,10 @@ export class GitHubWebhookController {
       return;
     }
 
-    const task = await this.prisma.task.findFirst({
-      where: {
-        githubIssueNumber: issueNumber,
-        repo: repository?.full_name,
-      },
-    });
+    const task = await this.taskModel.findOne({
+      githubIssueNumber: issueNumber,
+      repo: repository?.full_name,
+    }).exec();
 
     if (!task) {
       this.logger.warn(`No task found for issue #${issueNumber}`);
@@ -145,85 +145,85 @@ export class GitHubWebhookController {
     }
   }
 
-  private async handlePROpened(task: any, pullRequest: any) {
-    await this.prisma.task.update({
-      where: { id: task.id },
-      data: {
-        status: TaskStatus.pr_open,
+  private async handlePROpened(task: TaskDocument, pullRequest: any) {
+    const taskId = task._id.toString();
+
+    await this.taskModel.findByIdAndUpdate(task._id, {
+      $set: {
+        status: TaskStatus.PR_OPEN,
         githubPrNumber: pullRequest.number,
         githubPrUrl: pullRequest.html_url,
         githubPrStatus: 'open',
       },
-    });
-
-    await this.prisma.taskEvent.create({
-      data: {
-        taskId: task.id,
-        eventType: 'pr_opened',
-        payload: {
-          prNumber: pullRequest.number,
-          prUrl: pullRequest.html_url,
+      $push: {
+        events: {
+          eventType: 'pr_opened',
+          payload: {
+            prNumber: pullRequest.number,
+            prUrl: pullRequest.html_url,
+          },
+          createdAt: new Date(),
         },
       },
-    });
+    }).exec();
 
-    this.logger.log(`Task ${task.id} updated to pr_open`);
+    this.logger.log(`Task ${taskId} updated to pr_open`);
 
     // Send Slack notification
-    await this.slackNotificationService.notifyPROpened(task.id);
+    await this.slackNotificationService.notifyPROpened(taskId);
   }
 
-  private async handlePRMerged(task: any, pullRequest: any) {
-    await this.prisma.task.update({
-      where: { id: task.id },
-      data: {
-        status: TaskStatus.merged,
+  private async handlePRMerged(task: TaskDocument, pullRequest: any) {
+    const taskId = task._id.toString();
+
+    await this.taskModel.findByIdAndUpdate(task._id, {
+      $set: {
+        status: TaskStatus.MERGED,
         githubPrStatus: 'merged',
         completedAt: new Date(),
       },
-    });
-
-    await this.prisma.taskEvent.create({
-      data: {
-        taskId: task.id,
-        eventType: 'pr_merged',
-        payload: {
-          prNumber: pullRequest.number,
-          prUrl: pullRequest.html_url,
+      $push: {
+        events: {
+          eventType: 'pr_merged',
+          payload: {
+            prNumber: pullRequest.number,
+            prUrl: pullRequest.html_url,
+          },
+          createdAt: new Date(),
         },
       },
-    });
+    }).exec();
 
-    this.logger.log(`Task ${task.id} completed and merged`);
+    this.logger.log(`Task ${taskId} completed and merged`);
 
     // Send Slack notification
-    await this.slackNotificationService.notifyPRMerged(task.id);
+    await this.slackNotificationService.notifyPRMerged(taskId);
   }
 
-  private async handlePRClosed(task: any, pullRequest: any) {
-    await this.prisma.task.update({
-      where: { id: task.id },
-      data: {
-        status: TaskStatus.failed,
+  private async handlePRClosed(task: TaskDocument, pullRequest: any) {
+    const taskId = task._id.toString();
+
+    await this.taskModel.findByIdAndUpdate(task._id, {
+      $set: {
+        status: TaskStatus.FAILED,
         githubPrStatus: 'closed',
       },
-    });
-
-    await this.prisma.taskEvent.create({
-      data: {
-        taskId: task.id,
-        eventType: 'pr_closed',
-        payload: {
-          prNumber: pullRequest.number,
-          prUrl: pullRequest.html_url,
+      $push: {
+        events: {
+          eventType: 'pr_closed',
+          payload: {
+            prNumber: pullRequest.number,
+            prUrl: pullRequest.html_url,
+          },
+          createdAt: new Date(),
         },
       },
-    });
+    }).exec();
 
-    this.logger.log(`Task ${task.id} failed - PR closed without merge`);
+    this.logger.log(`Task ${taskId} failed - PR closed without merge`);
 
     // Send Slack notification
-    await this.slackNotificationService.notifyPRClosed(task.id);
+    await this.slackNotificationService.notifyPRClosed(taskId);
   }
 
   /**
@@ -271,28 +271,30 @@ export class GitHubWebhookController {
       );
 
       // Find task by issue number
-      const task = await this.prisma.task.findFirst({
-        where: {
-          githubIssueNumber: issue.number,
-          repo: repository?.full_name,
-        },
-      });
+      const task = await this.taskModel.findOne({
+        githubIssueNumber: issue.number,
+        repo: repository?.full_name,
+      }).exec();
 
       if (task) {
+        const taskId = task._id.toString();
+
         // Log event
-        await this.prisma.taskEvent.create({
-          data: {
-            taskId: task.id,
-            eventType: 'agent_question',
-            payload: {
-              comment: comment.body,
-              issueUrl: issue.html_url,
+        await this.taskModel.findByIdAndUpdate(task._id, {
+          $push: {
+            events: {
+              eventType: 'agent_question',
+              payload: {
+                comment: comment.body,
+                issueUrl: issue.html_url,
+              },
+              createdAt: new Date(),
             },
           },
-        });
+        }).exec();
 
         // Send Slack notification
-        await this.slackNotificationService.notifyAgentQuestion(task.id);
+        await this.slackNotificationService.notifyAgentQuestion(taskId);
       }
     }
   }

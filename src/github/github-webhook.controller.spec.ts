@@ -1,14 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
+import { getModelToken } from '@nestjs/mongoose';
 import { GitHubWebhookController } from './github-webhook.controller';
-import { PrismaService } from '../prisma/prisma.service';
+import { Task } from '../common/schemas/task.schema';
 import { SlackNotificationService } from '../slack/slack-notification.service';
 import * as crypto from 'crypto';
 
 describe('GitHubWebhookController', () => {
   let controller: GitHubWebhookController;
   const webhookSecret = 'test-secret';
+
+  const mockTaskModel = {
+    findOne: jest.fn().mockReturnThis(),
+    findByIdAndUpdate: jest.fn().mockReturnThis(),
+    exec: jest.fn().mockResolvedValue(null),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -24,13 +31,8 @@ describe('GitHubWebhookController', () => {
           },
         },
         {
-          provide: PrismaService,
-          useValue: {
-            task: {
-              findFirst: jest.fn().mockResolvedValue(null),
-              update: jest.fn().mockResolvedValue({}),
-            },
-          },
+          provide: getModelToken(Task.name),
+          useValue: mockTaskModel,
         },
         {
           provide: SlackNotificationService,
@@ -66,7 +68,10 @@ describe('GitHubWebhookController', () => {
       const payload = JSON.stringify({ test: 'data' });
       const invalidSignature = 'sha256=invalid';
 
-      const result = controller.verifyWebhookSignature(payload, invalidSignature);
+      const result = controller.verifyWebhookSignature(
+        payload,
+        invalidSignature,
+      );
 
       expect(result).toBe(false);
     });
@@ -86,7 +91,10 @@ describe('GitHubWebhookController', () => {
       const hmac = crypto.createHmac('sha256', webhookSecret);
       const signature = 'sha256=' + hmac.update(originalPayload).digest('hex');
 
-      const result = controller.verifyWebhookSignature(tamperedPayload, signature);
+      const result = controller.verifyWebhookSignature(
+        tamperedPayload,
+        signature,
+      );
 
       expect(result).toBe(false);
     });

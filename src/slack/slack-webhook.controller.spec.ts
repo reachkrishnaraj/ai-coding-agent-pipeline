@@ -27,12 +27,9 @@ describe('SlackWebhookController', () => {
           useValue: {
             create: jest.fn(),
             clarify: jest.fn(),
-            prisma: {
-              task: {
-                update: jest.fn(),
-                findFirst: jest.fn(),
-              },
-            },
+            updateSlackInfo: jest.fn(),
+            updateSlackThreadTs: jest.fn(),
+            findBySlackThread: jest.fn(),
           },
         },
         {
@@ -66,7 +63,9 @@ describe('SlackWebhookController', () => {
       };
 
       // Mock signature verification to pass
-      jest.spyOn<any, any>(controller, 'verifySlackSignature').mockReturnValue(true);
+      jest
+        .spyOn<any, any>(controller, 'verifySlackSignature')
+        .mockReturnValue(true);
 
       const result = await controller.handleWebhook(body, 'sig', '123');
 
@@ -76,7 +75,9 @@ describe('SlackWebhookController', () => {
     it('should reject invalid signature', async () => {
       const body = { type: 'event_callback' };
 
-      jest.spyOn<any, any>(controller, 'verifySlackSignature').mockReturnValue(false);
+      jest
+        .spyOn<any, any>(controller, 'verifySlackSignature')
+        .mockReturnValue(false);
 
       await expect(
         controller.handleWebhook(body, 'invalid-sig', '123'),
@@ -136,7 +137,11 @@ describe('SlackWebhookController', () => {
         .digest('hex');
       const signature = `v0=${hmac}`;
 
-      const result = controller['verifySlackSignature'](body, signature, timestamp);
+      const result = controller['verifySlackSignature'](
+        body,
+        signature,
+        timestamp,
+      );
 
       expect(result).toBe(true);
     });
@@ -146,7 +151,11 @@ describe('SlackWebhookController', () => {
       const oldTimestamp = String(Math.floor(Date.now() / 1000) - 400); // 400 seconds ago
       const signature = 'v0=abc123';
 
-      const result = controller['verifySlackSignature'](body, signature, oldTimestamp);
+      const result = controller['verifySlackSignature'](
+        body,
+        signature,
+        oldTimestamp,
+      );
 
       expect(result).toBe(false);
     });

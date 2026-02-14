@@ -12,33 +12,32 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_pipeline
+      - MONGODB_URI=mongodb://admin:admin@mongo:27017/ai_pipeline?authSource=admin
       - PORT=3000
     env_file:
       - .env
     volumes:
       - ./src:/app/src
       - ./web/src:/app/web/src
-      - ./prisma:/app/prisma
     depends_on:
-      postgres:
+      mongo:
         condition: service_healthy
     command: pnpm run start:dev
 
-  postgres:
-    image: postgres:16
+  mongo:
+    image: mongo:7
     container_name: ai-pipeline-db
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "27017:27017"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: ai_pipeline
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_DATABASE: ai_pipeline
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - mongodata:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -48,4 +47,4 @@ networks:
     name: ai-pipeline-network
 
 volumes:
-  pgdata:
+  mongodata:

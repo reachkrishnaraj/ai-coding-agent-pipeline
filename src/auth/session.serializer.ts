@@ -4,11 +4,17 @@ import { GitHubUser } from './github.strategy';
 
 @Injectable()
 export class SessionSerializer extends PassportSerializer {
-  serializeUser(user: GitHubUser, done: (err: Error | null, user: any) => void): void {
+  serializeUser(
+    user: GitHubUser,
+    done: (err: Error | null, user: any) => void,
+  ): void {
     done(null, user);
   }
 
-  deserializeUser(payload: any, done: (err: Error | null, user: any) => void): void {
+  deserializeUser(
+    payload: any,
+    done: (err: Error | null, user: any) => void,
+  ): void {
     done(null, payload);
   }
 }

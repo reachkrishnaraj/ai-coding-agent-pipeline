@@ -4,7 +4,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PrismaModule } from './prisma/prisma.module';
+import { DatabaseModule } from './database/database.module';
 import { TasksModule } from './tasks/tasks.module';
 import { AuthModule } from './auth/auth.module';
 import { SlackModule } from './slack/slack.module';
@@ -19,7 +19,7 @@ import { SlackModule } from './slack/slack.module';
       rootPath: join(__dirname, '..', 'web', 'dist'),
       exclude: ['/api*'],
     }),
-    PrismaModule,
+    DatabaseModule,
     TasksModule,
     AuthModule,
     SlackModule,

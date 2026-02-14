@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { SlackService } from './slack.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { Task, TaskDocument } from '../common/schemas/task.schema';
 
 @Injectable()
 export class SlackNotificationService {
@@ -8,7 +10,7 @@ export class SlackNotificationService {
 
   constructor(
     private readonly slackService: SlackService,
-    private readonly prisma: PrismaService,
+    @InjectModel(Task.name) private taskModel: Model<TaskDocument>,
   ) {}
 
   /**
@@ -16,9 +18,7 @@ export class SlackNotificationService {
    */
   async notifyTaskDispatched(taskId: string): Promise<void> {
     try {
-      const task = await this.prisma.task.findUnique({
-        where: { id: taskId },
-      });
+      const task = await this.taskModel.findById(taskId).exec();
 
       if (!task || !task.slackUserId) {
         return;
@@ -35,9 +35,7 @@ export class SlackNotificationService {
    */
   async notifyPROpened(taskId: string): Promise<void> {
     try {
-      const task = await this.prisma.task.findUnique({
-        where: { id: taskId },
-      });
+      const task = await this.taskModel.findById(taskId).exec();
 
       if (!task || !task.slackUserId) {
         return;
@@ -54,9 +52,7 @@ export class SlackNotificationService {
    */
   async notifyPRMerged(taskId: string): Promise<void> {
     try {
-      const task = await this.prisma.task.findUnique({
-        where: { id: taskId },
-      });
+      const task = await this.taskModel.findById(taskId).exec();
 
       if (!task || !task.slackUserId) {
         return;
@@ -73,9 +69,7 @@ export class SlackNotificationService {
    */
   async notifyPRClosed(taskId: string): Promise<void> {
     try {
-      const task = await this.prisma.task.findUnique({
-        where: { id: taskId },
-      });
+      const task = await this.taskModel.findById(taskId).exec();
 
       if (!task || !task.slackUserId) {
         return;
@@ -92,9 +86,7 @@ export class SlackNotificationService {
    */
   async notifyAgentQuestion(taskId: string): Promise<void> {
     try {
-      const task = await this.prisma.task.findUnique({
-        where: { id: taskId },
-      });
+      const task = await this.taskModel.findById(taskId).exec();
 
       if (!task || !task.slackUserId) {
         return;

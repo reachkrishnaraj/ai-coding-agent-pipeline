@@ -59,7 +59,9 @@ export class SlackWebhookController {
     @Headers('x-slack-request-timestamp') timestamp: string,
   ) {
     // Verify Slack signature
-    if (!this.verifySlackSignature(JSON.stringify(body), signature, timestamp)) {
+    if (
+      !this.verifySlackSignature(JSON.stringify(body), signature, timestamp)
+    ) {
       this.logger.warn('Invalid Slack signature');
       throw new BadRequestException('Invalid signature');
     }
@@ -104,21 +106,21 @@ export class SlackWebhookController {
         description,
         source: 'slack',
         createdBy: payload.user_id,
-        repo: this.configService.get<string>('DEFAULT_REPO') || 'mothership/finance-service',
-      });
+        repo:
+          this.configService.get<string>('DEFAULT_REPO') ||
+          'mothership/finance-service',
+      }) as unknown as { id: string; status: string; clarificationQuestions?: string[]; agent?: string; issue_url?: string };
 
       // Store Slack user ID on the task
-      await this.tasksService['prisma'].task.update({
-        where: { id: task.id },
-        data: {
-          slackUserId: payload.user_id,
-          slackChannelId: payload.channel_id,
-        },
-      });
+      await this.tasksService.updateSlackInfo(
+        task.id,
+        payload.user_id,
+        payload.channel_id,
+      );
 
       // Check if clarification is needed
       if (task.status === 'needs_clarification') {
-        const questions = (task.clarificationQuestions as string[]) || [];
+        const questions = task.clarificationQuestions || [];
 
         // Send questions as DM thread
         const threadTs = await this.slackService.sendClarificationQuestions(
@@ -129,10 +131,7 @@ export class SlackWebhookController {
 
         // Store thread_ts for matching replies
         if (threadTs) {
-          await this.tasksService['prisma'].task.update({
-            where: { id: task.id },
-            data: { slackThreadTs: threadTs },
-          });
+          await this.tasksService.updateSlackThreadTs(task.id, threadTs);
         }
 
         return {
@@ -143,11 +142,14 @@ export class SlackWebhookController {
 
       // Task was dispatched immediately
       return {
-        text: `Task dispatched to ${task['agent'] || 'AI agent'}. Issue: ${task['issue_url']}`,
+        text: `Task dispatched to ${task.agent || 'AI agent'}. Issue: ${task.issue_url}`,
         response_type: 'ephemeral',
       };
     } catch (error) {
-      this.logger.error(`Failed to handle slash command: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to handle slash command: ${error.message}`,
+        error.stack,
+      );
       return {
         text: `Error creating task: ${error.message}`,
         response_type: 'ephemeral',
@@ -187,34 +189,34 @@ export class SlackWebhookController {
       const threadTs = event.thread_ts;
       const answerText = event.text;
 
-      // Find task by thread_ts
-      const task = await this.tasksService['prisma'].task.findFirst({
-        where: {
-          slackThreadTs: threadTs,
-          status: 'needs_clarification',
-        },
-      });
+      // Find task by thread_ts using the proper service method
+      const task = await this.tasksService.findBySlackThread(threadTs);
 
       if (!task) {
         this.logger.warn(`No task found for thread_ts: ${threadTs}`);
         return;
       }
 
+      const taskId = task._id.toString();
+
       // Parse answers from the reply text
-      const questions = (task.clarificationQuestions as string[]) || [];
+      const questions = task.clarificationQuestions || [];
       const answers = this.parseAnswersFromText(answerText, questions.length);
 
       // Submit clarification
-      const result = await this.tasksService.clarify(task.id, { answers });
+      const result = await this.tasksService.clarify(taskId, { answers }) as unknown as { agent?: string; issue_url?: string };
 
       // Send confirmation in the thread
       await this.slackService.sendThreadReply(
         event.channel,
         threadTs,
-        `Got it! Task dispatched to ${result['agent'] || 'AI agent'}.\n\nIssue: ${result['issue_url']}`,
+        `Got it! Task dispatched to ${result.agent || 'AI agent'}.\n\nIssue: ${result.issue_url}`,
       );
     } catch (error) {
-      this.logger.error(`Failed to handle thread reply: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to handle thread reply: ${error.message}`,
+        error.stack,
+      );
 
       // Send error message to user
       if (event.channel && event.thread_ts) {
@@ -237,14 +239,14 @@ export class SlackWebhookController {
     const numberedMatches = [...text.matchAll(numberedPattern)];
 
     if (numberedMatches.length === expectedCount) {
-      return numberedMatches.map(match => match[1].trim());
+      return numberedMatches.map((match) => match[1].trim());
     }
 
     // Fallback: split by newlines and filter empty lines
     const lines = text
       .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
 
     // If we have exactly the expected count, use them
     if (lines.length === expectedCount) {
@@ -268,10 +270,14 @@ export class SlackWebhookController {
     signature: string,
     timestamp: string,
   ): boolean {
-    const signingSecret = this.configService.get<string>('SLACK_SIGNING_SECRET');
+    const signingSecret = this.configService.get<string>(
+      'SLACK_SIGNING_SECRET',
+    );
 
     if (!signingSecret) {
-      this.logger.warn('SLACK_SIGNING_SECRET not configured. Skipping signature verification.');
+      this.logger.warn(
+        'SLACK_SIGNING_SECRET not configured. Skipping signature verification.',
+      );
       return true; // Allow in development
     }
 

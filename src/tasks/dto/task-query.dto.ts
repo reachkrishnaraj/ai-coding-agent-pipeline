@@ -16,7 +16,16 @@ export class TaskQueryDto {
 
   @IsOptional()
   @IsString()
-  @IsIn(['received', 'analyzing', 'needs_clarification', 'dispatched', 'coding', 'pr_open', 'merged', 'failed'])
+  @IsIn([
+    'received',
+    'analyzing',
+    'needs_clarification',
+    'dispatched',
+    'coding',
+    'pr_open',
+    'merged',
+    'failed',
+  ])
   status?: string;
 
   @IsOptional()

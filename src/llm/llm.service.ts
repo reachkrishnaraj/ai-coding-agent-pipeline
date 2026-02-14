@@ -169,7 +169,9 @@ export class LlmService {
       let jsonContent = content.trim();
 
       // Remove ```json ... ``` or ``` ... ```
-      const codeBlockMatch = jsonContent.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
+      const codeBlockMatch = jsonContent.match(
+        /^```(?:json)?\s*\n?([\s\S]*?)\n?```$/,
+      );
       if (codeBlockMatch) {
         jsonContent = codeBlockMatch[1].trim();
       }
@@ -178,7 +180,9 @@ export class LlmService {
 
       // Validate required fields
       if (!parsed.task_type || !parsed.recommended_agent || !parsed.summary) {
-        this.logger.warn('LLM response missing required fields, using fallback');
+        this.logger.warn(
+          'LLM response missing required fields, using fallback',
+        );
         return this.getFallbackAnalysis(task);
       }
 
@@ -188,7 +192,8 @@ export class LlmService {
         task_type: parsed.task_type,
         recommended_agent: parsed.recommended_agent,
         summary: parsed.summary,
-        suggested_acceptance_criteria: parsed.suggested_acceptance_criteria || [],
+        suggested_acceptance_criteria:
+          parsed.suggested_acceptance_criteria || [],
         likely_files: parsed.likely_files || [],
         repo: parsed.repo || task.repo,
       };
@@ -212,9 +217,13 @@ export class LlmService {
       ],
       task_type: (task.task_type_hint as any) || 'bug-fix',
       recommended_agent: 'claude-code',
-      summary: task.description.slice(0, 100) + (task.description.length > 100 ? '...' : ''),
+      summary:
+        task.description.slice(0, 100) +
+        (task.description.length > 100 ? '...' : ''),
       suggested_acceptance_criteria: [],
-      likely_files: task.files_hint ? task.files_hint.split(',').map(f => f.trim()) : [],
+      likely_files: task.files_hint
+        ? task.files_hint.split(',').map((f) => f.trim())
+        : [],
       repo: task.repo,
     };
   }

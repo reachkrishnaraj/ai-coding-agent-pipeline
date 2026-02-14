@@ -18,8 +18,11 @@ export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
   constructor(private readonly configService: ConfigService) {
     super({
       clientID: configService.get<string>('GITHUB_OAUTH_CLIENT_ID') || '',
-      clientSecret: configService.get<string>('GITHUB_OAUTH_CLIENT_SECRET') || '',
-      callbackURL: configService.get<string>('GITHUB_OAUTH_CALLBACK_URL') || 'http://localhost:3000/api/auth/github/callback',
+      clientSecret:
+        configService.get<string>('GITHUB_OAUTH_CLIENT_SECRET') || '',
+      callbackURL:
+        configService.get<string>('GITHUB_OAUTH_CALLBACK_URL') ||
+        'http://localhost:3000/api/auth/github/callback',
       scope: ['read:user', 'read:org'],
     });
   }
@@ -34,7 +37,9 @@ export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
 
     try {
       const { data: orgs } = await octokit.rest.orgs.listForAuthenticatedUser();
-      const isMemberOfMothership = orgs.some(org => org.login === 'mothership');
+      const isMemberOfMothership = orgs.some(
+        (org) => org.login === 'mothership',
+      );
 
       if (!isMemberOfMothership) {
         throw new UnauthorizedException(
@@ -54,7 +59,9 @@ export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
-      throw new UnauthorizedException('Failed to verify organization membership');
+      throw new UnauthorizedException(
+        'Failed to verify organization membership',
+      );
     }
   }
 }

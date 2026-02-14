@@ -48,10 +48,16 @@ export function generateIssueBody(data: IssueTemplateData): string {
   // Agent Instructions
   sections.push(`## Agent Instructions`);
   sections.push(`- Task type: **${analysis.task_type}**`);
-  sections.push(`- Read prompt template: \`.ai/prompts/${analysis.task_type}.md\``);
+  sections.push(
+    `- Read prompt template: \`.ai/prompts/${analysis.task_type}.md\``,
+  );
   if (clarificationQA && clarificationQA.length > 0) {
-    sections.push(`- This task has been pre-clarified. All questions have been answered.`);
-    sections.push(`- Proceed directly to implementation. Do NOT ask clarifying questions.`);
+    sections.push(
+      `- This task has been pre-clarified. All questions have been answered.`,
+    );
+    sections.push(
+      `- Proceed directly to implementation. Do NOT ask clarifying questions.`,
+    );
   }
   sections.push('');
 

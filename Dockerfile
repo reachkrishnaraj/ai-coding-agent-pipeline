@@ -17,9 +17,6 @@ RUN pnpm install --frozen-lockfile
 # Copy application source
 COPY . .
 
-# Generate Prisma client
-RUN npx prisma generate
-
 # Build backend (NestJS)
 RUN pnpm run build
 
@@ -40,12 +37,6 @@ COPY package.json pnpm-lock.yaml ./
 
 # Install production dependencies only
 RUN pnpm install --prod --frozen-lockfile
-
-# Copy Prisma schema for runtime
-COPY prisma ./prisma
-
-# Generate Prisma client in production
-RUN npx prisma generate
 
 # Copy built backend from builder
 COPY --from=builder /app/dist ./dist

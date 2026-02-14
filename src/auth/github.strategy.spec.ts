@@ -34,7 +34,8 @@ describe('GitHubStrategy', () => {
               const config = {
                 GITHUB_OAUTH_CLIENT_ID: 'test-client-id',
                 GITHUB_OAUTH_CLIENT_SECRET: 'test-client-secret',
-                GITHUB_OAUTH_CALLBACK_URL: 'http://localhost:3000/api/auth/github/callback',
+                GITHUB_OAUTH_CALLBACK_URL:
+                  'http://localhost:3000/api/auth/github/callback',
               };
               return config[key];
             }),

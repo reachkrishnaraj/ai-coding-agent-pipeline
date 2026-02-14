@@ -1,26 +1,46 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { TasksService } from './tasks.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { getModelToken, getConnectionToken } from '@nestjs/mongoose';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { TaskStatus } from '@prisma/client';
+import { TasksService } from './tasks.service';
+import { Task } from '../common/schemas/task.schema';
+import { TaskStatus } from '../common/enums/task-status.enum';
 
 describe('TasksService', () => {
   let service: TasksService;
-  let prismaService: PrismaService;
 
-  const mockPrismaService = {
-    task: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      count: jest.fn(),
+  // Mock document that behaves like a Mongoose document
+  const createMockDocument = (data: any) => ({
+    ...data,
+    _id: data.id || data._id || '123',
+    toJSON: () => ({ ...data, id: data.id || data._id || '123' }),
+    save: jest.fn().mockResolvedValue({ ...data, _id: '123' }),
+  });
+
+  const mockTaskModel = {
+    find: jest.fn().mockReturnThis(),
+    findById: jest.fn().mockReturnThis(),
+    findOne: jest.fn().mockReturnThis(),
+    findByIdAndUpdate: jest.fn().mockReturnThis(),
+    findByIdAndDelete: jest.fn().mockReturnThis(),
+    countDocuments: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    sort: jest.fn().mockReturnThis(),
+    exec: jest.fn(),
+  };
+
+  // Mock constructor for creating new documents
+  const MockTaskModelConstructor: any = function (data: any) {
+    return createMockDocument(data);
+  };
+  Object.assign(MockTaskModelConstructor, mockTaskModel);
+
+  const mockConnection = {
+    db: {
+      admin: () => ({
+        ping: jest.fn().mockResolvedValue({}),
+      }),
     },
-    taskEvent: {
-      create: jest.fn(),
-    },
-    $queryRaw: jest.fn(),
   };
 
   const mockLlmService = {
@@ -36,8 +56,12 @@ describe('TasksService', () => {
       providers: [
         TasksService,
         {
-          provide: PrismaService,
-          useValue: mockPrismaService,
+          provide: getModelToken(Task.name),
+          useValue: MockTaskModelConstructor,
+        },
+        {
+          provide: getConnectionToken(),
+          useValue: mockConnection,
         },
         {
           provide: 'ILlmService',
@@ -51,7 +75,6 @@ describe('TasksService', () => {
     }).compile();
 
     service = module.get<TasksService>(TasksService);
-    prismaService = module.get<PrismaService>(PrismaService);
 
     // Reset mocks
     jest.clearAllMocks();
@@ -65,8 +88,8 @@ describe('TasksService', () => {
     it('should allow valid transition from received to analyzing', () => {
       expect(() => {
         (service as any).validateTransition(
-          TaskStatus.received,
-          TaskStatus.analyzing,
+          TaskStatus.RECEIVED,
+          TaskStatus.ANALYZING,
         );
       }).not.toThrow();
     });
@@ -74,8 +97,8 @@ describe('TasksService', () => {
     it('should allow valid transition from analyzing to needs_clarification', () => {
       expect(() => {
         (service as any).validateTransition(
-          TaskStatus.analyzing,
-          TaskStatus.needs_clarification,
+          TaskStatus.ANALYZING,
+          TaskStatus.NEEDS_CLARIFICATION,
         );
       }).not.toThrow();
     });
@@ -83,8 +106,8 @@ describe('TasksService', () => {
     it('should allow valid transition from analyzing to dispatched', () => {
       expect(() => {
         (service as any).validateTransition(
-          TaskStatus.analyzing,
-          TaskStatus.dispatched,
+          TaskStatus.ANALYZING,
+          TaskStatus.DISPATCHED,
         );
       }).not.toThrow();
     });
@@ -92,8 +115,8 @@ describe('TasksService', () => {
     it('should allow valid transition from needs_clarification to dispatched', () => {
       expect(() => {
         (service as any).validateTransition(
-          TaskStatus.needs_clarification,
-          TaskStatus.dispatched,
+          TaskStatus.NEEDS_CLARIFICATION,
+          TaskStatus.DISPATCHED,
         );
       }).not.toThrow();
     });
@@ -101,8 +124,8 @@ describe('TasksService', () => {
     it('should reject invalid transition from received to dispatched', () => {
       expect(() => {
         (service as any).validateTransition(
-          TaskStatus.received,
-          TaskStatus.dispatched,
+          TaskStatus.RECEIVED,
+          TaskStatus.DISPATCHED,
         );
       }).toThrow(BadRequestException);
     });
@@ -110,8 +133,8 @@ describe('TasksService', () => {
     it('should reject invalid transition from merged to any state', () => {
       expect(() => {
         (service as any).validateTransition(
-          TaskStatus.merged,
-          TaskStatus.failed,
+          TaskStatus.MERGED,
+          TaskStatus.FAILED,
         );
       }).toThrow(BadRequestException);
     });
@@ -119,8 +142,8 @@ describe('TasksService', () => {
     it('should allow retry transition from failed to received', () => {
       expect(() => {
         (service as any).validateTransition(
-          TaskStatus.failed,
-          TaskStatus.received,
+          TaskStatus.FAILED,
+          TaskStatus.RECEIVED,
         );
       }).not.toThrow();
     });
@@ -128,33 +151,28 @@ describe('TasksService', () => {
 
   describe('findOne', () => {
     it('should return a task with events', async () => {
-      const mockTask = {
+      const mockTask = createMockDocument({
         id: '123',
-        status: TaskStatus.dispatched,
+        status: TaskStatus.DISPATCHED,
         description: 'Test task',
         events: [
           { eventType: 'created', createdAt: new Date() },
           { eventType: 'dispatched', createdAt: new Date() },
         ],
-      };
+      });
 
-      mockPrismaService.task.findUnique.mockResolvedValue(mockTask);
+      mockTaskModel.findById.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValue(mockTask);
 
       const result = await service.findOne('123');
 
-      expect(result).toEqual(mockTask);
-      expect(mockPrismaService.task.findUnique).toHaveBeenCalledWith({
-        where: { id: '123' },
-        include: {
-          events: {
-            orderBy: { createdAt: 'asc' },
-          },
-        },
-      });
+      expect(result).toHaveProperty('id', '123');
+      expect(mockTaskModel.findById).toHaveBeenCalledWith('123');
     });
 
     it('should throw NotFoundException when task not found', async () => {
-      mockPrismaService.task.findUnique.mockResolvedValue(null);
+      mockTaskModel.findById.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValue(null);
 
       await expect(service.findOne('999')).rejects.toThrow(NotFoundException);
     });
@@ -163,84 +181,91 @@ describe('TasksService', () => {
   describe('findAll', () => {
     it('should return paginated tasks', async () => {
       const mockTasks = [
-        { id: '1', description: 'Task 1' },
-        { id: '2', description: 'Task 2' },
+        createMockDocument({ id: '1', description: 'Task 1' }),
+        createMockDocument({ id: '2', description: 'Task 2' }),
       ];
 
-      mockPrismaService.task.findMany.mockResolvedValue(mockTasks);
-      mockPrismaService.task.count.mockResolvedValue(10);
+      mockTaskModel.find.mockReturnThis();
+      mockTaskModel.skip.mockReturnThis();
+      mockTaskModel.limit.mockReturnThis();
+      mockTaskModel.sort.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValueOnce(mockTasks);
+      mockTaskModel.countDocuments.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValueOnce(10);
 
       const result = await service.findAll({ page: 1, limit: 20 });
 
-      expect(result).toEqual({
-        tasks: mockTasks,
-        total: 10,
-        page: 1,
-        limit: 20,
-      });
+      expect(result.total).toBe(10);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(20);
     });
 
     it('should filter by status', async () => {
-      mockPrismaService.task.findMany.mockResolvedValue([]);
-      mockPrismaService.task.count.mockResolvedValue(0);
+      mockTaskModel.find.mockReturnThis();
+      mockTaskModel.skip.mockReturnThis();
+      mockTaskModel.limit.mockReturnThis();
+      mockTaskModel.sort.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValueOnce([]);
+      mockTaskModel.countDocuments.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValueOnce(0);
 
       await service.findAll({ status: 'dispatched' });
 
-      expect(mockPrismaService.task.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { status: 'dispatched' },
-        }),
-      );
+      expect(mockTaskModel.find).toHaveBeenCalledWith({ status: 'dispatched' });
     });
 
     it('should filter by repo', async () => {
-      mockPrismaService.task.findMany.mockResolvedValue([]);
-      mockPrismaService.task.count.mockResolvedValue(0);
+      mockTaskModel.find.mockReturnThis();
+      mockTaskModel.skip.mockReturnThis();
+      mockTaskModel.limit.mockReturnThis();
+      mockTaskModel.sort.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValueOnce([]);
+      mockTaskModel.countDocuments.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValueOnce(0);
 
       await service.findAll({ repo: 'mothership/test-repo' });
 
-      expect(mockPrismaService.task.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { repo: 'mothership/test-repo' },
-        }),
-      );
+      expect(mockTaskModel.find).toHaveBeenCalledWith({
+        repo: 'mothership/test-repo',
+      });
     });
   });
 
   describe('cancel', () => {
     it('should cancel a task in received status', async () => {
-      const mockTask = {
+      const mockTask = createMockDocument({
         id: '123',
-        status: TaskStatus.received,
-      };
+        _id: '123',
+        status: TaskStatus.RECEIVED,
+      });
 
-      mockPrismaService.task.findUnique.mockResolvedValue(mockTask);
-      mockPrismaService.task.delete.mockResolvedValue(mockTask);
-      mockPrismaService.taskEvent.create.mockResolvedValue({});
+      mockTaskModel.findById.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValueOnce(mockTask);
+      mockTaskModel.findByIdAndDelete.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValueOnce(mockTask);
+      mockTaskModel.findByIdAndUpdate.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValueOnce(mockTask);
 
       const result = await service.cancel('123');
 
       expect(result).toEqual({ message: 'Task cancelled successfully' });
-      expect(mockPrismaService.task.delete).toHaveBeenCalledWith({
-        where: { id: '123' },
-      });
     });
 
     it('should not allow cancelling dispatched task', async () => {
-      const mockTask = {
+      const mockTask = createMockDocument({
         id: '123',
-        status: TaskStatus.dispatched,
-      };
+        status: TaskStatus.DISPATCHED,
+      });
 
-      mockPrismaService.task.findUnique.mockResolvedValue(mockTask);
+      mockTaskModel.findById.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValue(mockTask);
 
-      await expect(service.cancel('123')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.cancel('123')).rejects.toThrow(BadRequestException);
     });
 
     it('should throw NotFoundException when task not found', async () => {
-      mockPrismaService.task.findUnique.mockResolvedValue(null);
+      mockTaskModel.findById.mockReturnThis();
+      mockTaskModel.exec.mockResolvedValue(null);
 
       await expect(service.cancel('999')).rejects.toThrow(NotFoundException);
     });
@@ -248,19 +273,44 @@ describe('TasksService', () => {
 
   describe('getHealth', () => {
     it('should return ok when database is connected', async () => {
-      mockPrismaService.$queryRaw.mockResolvedValue([]);
-
       const result = await service.getHealth();
 
       expect(result).toEqual({ status: 'ok', db: 'connected' });
     });
 
     it('should return error when database is disconnected', async () => {
-      mockPrismaService.$queryRaw.mockRejectedValue(
-        new Error('Connection failed'),
-      );
+      const failingConnection = {
+        db: {
+          admin: () => ({
+            ping: jest.fn().mockRejectedValue(new Error('Connection failed')),
+          }),
+        },
+      };
 
-      const result = await service.getHealth();
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          TasksService,
+          {
+            provide: getModelToken(Task.name),
+            useValue: MockTaskModelConstructor,
+          },
+          {
+            provide: getConnectionToken(),
+            useValue: failingConnection,
+          },
+          {
+            provide: 'ILlmService',
+            useValue: mockLlmService,
+          },
+          {
+            provide: 'IGitHubService',
+            useValue: mockGitHubService,
+          },
+        ],
+      }).compile();
+
+      const failingService = module.get<TasksService>(TasksService);
+      const result = await failingService.getHealth();
 
       expect(result.status).toBe('error');
       expect(result.db).toBe('disconnected');

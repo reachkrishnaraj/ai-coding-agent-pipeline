@@ -3,7 +3,7 @@
 **Version:** 2.1
 **Hosting:** Railway (container)
 **Interface:** Web UI + Slack
-**State:** Persistent (PostgreSQL)
+**State:** Persistent (MongoDB)
 **Agents:** Claude Code + Codex + Copilot
 **Auth:** GitHub OAuth (org-wide)
 **Scope:** mothership/* repos only
@@ -80,82 +80,58 @@ A cloud-hosted service that manages the full lifecycle of AI coding tasks: intak
 
 ---
 
-## 3. Database Schema (PostgreSQL)
+## 3. Database Schema (MongoDB)
 
-### 3.1 tasks
+### 3.1 Task Document
 
-```sql
-CREATE TABLE tasks (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  source          VARCHAR(20) NOT NULL,           -- 'web' | 'slack' | 'api' | 'asana'
-  status          VARCHAR(30) NOT NULL DEFAULT 'received',
-  -- Status flow: received → analyzing → needs_clarification → dispatched → coding → pr_open → merged | failed
+MongoDB collection: `tasks`
 
-  -- User input
-  description     TEXT NOT NULL,
-  task_type_hint  VARCHAR(30),                    -- User's hint, nullable
-  repo            VARCHAR(200) NOT NULL DEFAULT 'mothership/finance-service',
-  files_hint      TEXT,                           -- Comma-separated
-  acceptance_criteria TEXT,
-  priority        VARCHAR(10) NOT NULL DEFAULT 'normal',
+See `src/common/schemas/task.schema.ts` for the Mongoose schema definition.
 
-  -- LLM analysis
-  llm_analysis    JSONB,                          -- Full LLM response stored as JSON
-  llm_summary     TEXT,                           -- One-sentence summary (becomes issue title)
-  task_type       VARCHAR(30),                    -- LLM-detected: bug-fix | feature | refactor | test-coverage
-  recommended_agent VARCHAR(20),                  -- claude-code | codex | copilot
-  likely_files    JSONB,                          -- Array of file paths
-  suggested_criteria JSONB,                       -- Array of acceptance criteria strings
+**Key Fields:**
+- `_id` — MongoDB ObjectId (auto-generated)
+- `source` — 'web' | 'slack' | 'api' | 'asana'
+- `status` — received → analyzing → needs_clarification → dispatched → coding → pr_open → merged | failed
+- `description` — User's task description
+- `taskTypeHint` — User's hint, optional
+- `repo` — Target repository (default: 'mothership/finance-service')
+- `filesHint` — Comma-separated file hints
+- `acceptanceCriteria` — User-provided criteria
+- `priority` — 'normal' | 'urgent'
+- `llmAnalysis` — Full LLM response stored as JSON object
+- `llmSummary` — One-sentence summary (becomes issue title)
+- `taskType` — LLM-detected: bug-fix | feature | refactor | test-coverage
+- `recommendedAgent` — claude-code | codex | copilot
+- `likelyFiles` — Array of file paths
+- `suggestedCriteria` — Array of acceptance criteria strings
+- `clarificationQuestions` — Array of question strings from LLM
+- `clarificationAnswers` — Array of answer strings from user
+- `isClarified` — Boolean flag
+- `githubIssueNumber`, `githubIssueUrl`, `githubPrNumber`, `githubPrUrl`, `githubPrStatus`, `githubBranch` — GitHub integration fields
+- `slackUserId`, `slackChannelId`, `slackThreadTs` — Slack integration fields
+- `createdBy`, `createdAt`, `updatedAt`, `dispatchedAt`, `completedAt`, `errorMessage` — Metadata
+- `events` — Embedded array of event objects (denormalized audit log)
 
-  -- Clarification
-  clarification_questions JSONB,                  -- Array of question strings from LLM
-  clarification_answers   JSONB,                  -- Array of answer strings from user
-  is_clarified    BOOLEAN NOT NULL DEFAULT FALSE,
+**Indexes:**
+- `{ status: 1 }` — Filter by status
+- `{ repo: 1 }` — Filter by repo
+- `{ createdAt: -1 }` — Sort by creation date
+- `{ githubIssueNumber: 1 }` (sparse) — Lookup by issue number
+- `{ slackThreadTs: 1 }` (sparse) — Lookup by Slack thread
 
-  -- GitHub
-  github_issue_number INTEGER,
-  github_issue_url    TEXT,
-  github_pr_number    INTEGER,
-  github_pr_url       TEXT,
-  github_pr_status    VARCHAR(20),                -- 'open' | 'merged' | 'closed'
-  github_branch       VARCHAR(200),
+### 3.2 Embedded Events
 
-  -- Slack
-  slack_user_id       VARCHAR(30),
-  slack_channel_id    VARCHAR(30),
-  slack_thread_ts     VARCHAR(30),
+Events are stored as an embedded array within each task document:
 
-  -- Meta
-  created_by      VARCHAR(100),                   -- Email or Slack user ID
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  dispatched_at   TIMESTAMPTZ,
-  completed_at    TIMESTAMPTZ,
-  error_message   TEXT
-);
-
-CREATE INDEX idx_tasks_status ON tasks(status);
-CREATE INDEX idx_tasks_repo ON tasks(repo);
-CREATE INDEX idx_tasks_created ON tasks(created_at DESC);
-CREATE INDEX idx_tasks_github_issue ON tasks(github_issue_number) WHERE github_issue_number IS NOT NULL;
+```javascript
+events: [
+  { eventType: 'created', payload: {}, createdAt: ISODate(...) },
+  { eventType: 'analyzing', payload: {}, createdAt: ISODate(...) },
+  { eventType: 'dispatched', payload: { issueNumber: 42 }, createdAt: ISODate(...) }
+]
 ```
 
-### 3.2 task_events (audit log)
-
-```sql
-CREATE TABLE task_events (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  task_id     UUID NOT NULL REFERENCES tasks(id),
-  event_type  VARCHAR(50) NOT NULL,
-  -- Event types: created, analyzing, llm_response, clarification_sent, clarification_received,
-  --              dispatched, agent_started, agent_question, agent_answer, pr_opened,
-  --              pr_review_requested, pr_merged, pr_closed, failed
-  payload     JSONB,                              -- Event-specific data
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_events_task ON task_events(task_id, created_at);
-```
+This denormalized structure provides fast reads without joins.
 
 ---
 
@@ -512,7 +488,7 @@ PORT=3000
 NODE_ENV=production
 
 # Database
-DATABASE_URL=postgresql://user:pass@host:5432/ai_pipeline
+MONGODB_URI=mongodb://admin:admin@localhost:27017/ai_pipeline?authSource=admin
 
 # LLM
 OPENAI_API_KEY=sk-...
@@ -536,10 +512,10 @@ SLACK_DEFAULT_USER_ID=U0A6VN4J3PW
 |-----------|--------|-----|
 | **Runtime** | Node.js 20 + TypeScript 5 | Matches Mothership stack |
 | **Framework** | NestJS 11 | Matches Finance Service, structured, built-in validation |
-| **Database** | PostgreSQL 16 | Railway provides managed Postgres |
-| **ORM** | Prisma 6 | Matches Finance Service |
+| **Database** | MongoDB 7 | Flexible schema for LLM responses, embedded documents for events |
+| **ODM** | Mongoose 8 | Type-safe MongoDB access with schema validation |
 | **Frontend** | React + Tailwind (or Next.js) | Simple dashboard, could be a separate SPA or server-rendered |
-| **Hosting** | Railway | Container deployment, managed Postgres, $5/mo, deploy from GitHub |
+| **Hosting** | Railway | Container deployment, MongoDB Atlas or Railway MongoDB plugin, $5/mo, deploy from GitHub |
 | **Queue** | Bull + Redis (v2) | For async LLM calls and retries. Skip for MVP — synchronous is fine |
 
 ---
@@ -629,15 +605,18 @@ ai-pipeline/
 │   │   ├── slack.service.ts          # Send DMs, notifications
 │   │   └── slack-webhook.controller.ts  # Slash commands, event callbacks
 │   │
-│   └── common/
-│       ├── config/
-│       │   └── configuration.ts      # Environment variable validation
-│       └── filters/
-│           └── http-exception.filter.ts
-│
-├── prisma/
-│   ├── schema.prisma                 # Database schema
-│   └── migrations/
+│   ├── common/
+│   │   ├── config/
+│   │   │   └── configuration.ts      # Environment variable validation
+│   │   ├── enums/
+│   │   │   └── task-status.enum.ts   # Task status enum
+│   │   ├── schemas/
+│   │   │   └── task.schema.ts        # Mongoose Task schema
+│   │   └── filters/
+│   │       └── http-exception.filter.ts
+│   │
+│   └── database/
+│       └── database.module.ts        # MongoDB connection module
 │
 ├── web/                              # Frontend (React or Next.js)
 │   ├── src/
@@ -710,16 +689,15 @@ internalPort = 3000
 ### Required Railway Services
 
 1. **App** — Your NestJS container (deploy from GitHub)
-2. **PostgreSQL** — Railway managed Postgres (click "New" → "Database" → "PostgreSQL")
+2. **MongoDB** — MongoDB Atlas (free tier) or Railway MongoDB plugin
 3. **Redis** — (v2, for Bull queues. Skip for MVP)
 
 ### Setup Steps
 
 1. Create Railway project
-2. Add PostgreSQL service → copy `DATABASE_URL`
+2. Create MongoDB Atlas cluster (free tier) OR add Railway MongoDB plugin → copy `MONGODB_URI`
 3. Connect GitHub repo → Railway auto-deploys on push
-4. Set environment variables in Railway dashboard
-5. Run `npx prisma migrate deploy` (Railway can run this as a deploy command)
+4. Set environment variables in Railway dashboard (MONGODB_URI, OPENAI_API_KEY, etc.)
 
 ---
 
@@ -818,6 +796,6 @@ User can change the dropdown before submitting. Default is the LLM recommendatio
 | API abuse | Rate limiting on `/api/tasks` (10 req/min per user) |
 | Cross-org access | Validate repo starts with `mothership/` before any GitHub API call |
 | Secret exposure | All secrets in Railway env vars, never in code |
-| SQL injection | Prisma ORM handles parameterized queries |
+| NoSQL injection | Mongoose schema validation + sanitization prevents operator injection |
 | LLM prompt injection | System prompt is server-side, user input goes in user message only |
 | Session hijacking | Signed HTTP-only cookies, CSRF protection |

@@ -206,7 +206,9 @@ describe('LlmService', () => {
 
       expect(message).toContain('Task Description: Fix payment bug');
       expect(message).toContain("User's Type Hint: bug-fix");
-      expect(message).toContain('Target Repository: mothership/finance-service');
+      expect(message).toContain(
+        'Target Repository: mothership/finance-service',
+      );
       expect(message).toContain('Files/Modules to Focus On: src/payment.ts');
       expect(message).toContain(
         "User's Acceptance Criteria: Payment updates correctly",

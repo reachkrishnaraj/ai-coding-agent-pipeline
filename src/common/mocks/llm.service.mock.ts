@@ -22,7 +22,12 @@ export class LlmServiceMock implements ILlmService {
             'What is the current behavior that needs to be changed?',
           ]
         : undefined,
-      task_type: (task.task_type_hint as 'bug-fix' | 'feature' | 'refactor' | 'test-coverage') || 'bug-fix',
+      task_type:
+        (task.task_type_hint as
+          | 'bug-fix'
+          | 'feature'
+          | 'refactor'
+          | 'test-coverage') || 'bug-fix',
       recommended_agent: 'claude-code',
       summary: `Fix: ${task.description.substring(0, 50)}`,
       suggested_acceptance_criteria: [

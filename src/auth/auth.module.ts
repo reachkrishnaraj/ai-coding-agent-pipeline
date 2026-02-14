@@ -7,10 +7,7 @@ import { GitHubStrategy } from './github.strategy';
 import { SessionSerializer } from './session.serializer';
 
 @Module({
-  imports: [
-    PassportModule.register({ session: true }),
-    ConfigModule,
-  ],
+  imports: [PassportModule.register({ session: true }), ConfigModule],
   controllers: [AuthController],
   providers: [AuthService, GitHubStrategy, SessionSerializer],
   exports: [AuthService],

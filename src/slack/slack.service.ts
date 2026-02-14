@@ -10,7 +10,9 @@ export class SlackService {
   constructor(private readonly configService: ConfigService) {
     const token = this.configService.get<string>('SLACK_BOT_TOKEN');
     if (!token) {
-      this.logger.warn('SLACK_BOT_TOKEN not configured. Slack features will be disabled.');
+      this.logger.warn(
+        'SLACK_BOT_TOKEN not configured. Slack features will be disabled.',
+      );
     }
     this.client = new WebClient(token);
   }
@@ -33,7 +35,10 @@ export class SlackService {
 
       return result.ts as string;
     } catch (error) {
-      this.logger.error(`Failed to send DM to ${slackUserId}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send DM to ${slackUserId}: ${error.message}`,
+        error.stack,
+      );
       // Slack is non-blocking: log warning and continue
       return null;
     }
@@ -42,10 +47,16 @@ export class SlackService {
   /**
    * Send a reply in a thread
    */
-  async sendThreadReply(channel: string, threadTs: string, text: string): Promise<void> {
+  async sendThreadReply(
+    channel: string,
+    threadTs: string,
+    text: string,
+  ): Promise<void> {
     try {
       if (!this.configService.get<string>('SLACK_BOT_TOKEN')) {
-        this.logger.warn('Cannot send thread reply: SLACK_BOT_TOKEN not configured');
+        this.logger.warn(
+          'Cannot send thread reply: SLACK_BOT_TOKEN not configured',
+        );
         return;
       }
 
@@ -70,7 +81,9 @@ export class SlackService {
   async sendTaskNotification(task: any, eventType: string): Promise<void> {
     try {
       if (!this.configService.get<string>('SLACK_BOT_TOKEN')) {
-        this.logger.warn('Cannot send notification: SLACK_BOT_TOKEN not configured');
+        this.logger.warn(
+          'Cannot send notification: SLACK_BOT_TOKEN not configured',
+        );
         return;
       }
 
@@ -111,7 +124,10 @@ export class SlackService {
 
       await this.sendDM(slackUserId, message);
     } catch (error) {
-      this.logger.error(`Failed to send task notification: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send task notification: ${error.message}`,
+        error.stack,
+      );
       // Slack is non-blocking: log warning and continue
     }
   }
@@ -126,11 +142,16 @@ export class SlackService {
   ): Promise<string | null> {
     try {
       if (!this.configService.get<string>('SLACK_BOT_TOKEN')) {
-        this.logger.warn('Cannot send clarification questions: SLACK_BOT_TOKEN not configured');
+        this.logger.warn(
+          'Cannot send clarification questions: SLACK_BOT_TOKEN not configured',
+        );
         return null;
       }
 
-      const message = this.formatClarificationQuestionsMessage(taskId, questions);
+      const message = this.formatClarificationQuestionsMessage(
+        taskId,
+        questions,
+      );
       return await this.sendDM(slackUserId, message);
     } catch (error) {
       this.logger.error(
@@ -144,46 +165,63 @@ export class SlackService {
   // Formatting helpers
   private formatDispatchedMessage(task: any): string {
     const agent = task.recommendedAgent || 'AI agent';
-    return `*Task dispatched to ${agent}*\n\n` +
+    return (
+      `*Task dispatched to ${agent}*\n\n` +
       `Task: ${task.llmSummary || task.description}\n` +
-      `Issue: ${task.githubIssueUrl || 'Creating...'}`;
+      `Issue: ${task.githubIssueUrl || 'Creating...'}`
+    );
   }
 
   private formatPrOpenedMessage(task: any): string {
-    return `*PR ready for review*\n\n` +
+    return (
+      `*PR ready for review*\n\n` +
       `Task: ${task.llmSummary || task.description}\n` +
-      `PR: ${task.githubPrUrl}`;
+      `PR: ${task.githubPrUrl}`
+    );
   }
 
   private formatPrMergedMessage(task: any): string {
-    return `*Done! PR has been merged.*\n\n` +
+    return (
+      `*Done! PR has been merged.*\n\n` +
       `Task: ${task.llmSummary || task.description}\n` +
-      `PR: ${task.githubPrUrl}`;
+      `PR: ${task.githubPrUrl}`
+    );
   }
 
   private formatPrClosedMessage(task: any): string {
-    return `*PR needs attention*\n\n` +
+    return (
+      `*PR needs attention*\n\n` +
       `Task: ${task.llmSummary || task.description}\n` +
       `PR: ${task.githubPrUrl}\n\n` +
-      `The PR was closed without merging. Please review.`;
+      `The PR was closed without merging. Please review.`
+    );
   }
 
   private formatAgentQuestionMessage(task: any): string {
-    return `*The agent has a question about your task*\n\n` +
+    return (
+      `*The agent has a question about your task*\n\n` +
       `Task: ${task.llmSummary || task.description}\n` +
-      `Please check the GitHub issue for details.`;
+      `Please check the GitHub issue for details.`
+    );
   }
 
   private formatClarificationMessage(task: any): string {
     const questions = task.clarificationQuestions as string[];
-    return `*I need some clarification before creating the task*\n\n` +
+    return (
+      `*I need some clarification before creating the task*\n\n` +
       questions.map((q, i) => `${i + 1}. ${q}`).join('\n') +
-      '\n\nPlease reply in this thread with your answers.';
+      '\n\nPlease reply in this thread with your answers.'
+    );
   }
 
-  private formatClarificationQuestionsMessage(taskId: string, questions: string[]): string {
-    return `*I need some clarification before dispatching your task*\n\n` +
+  private formatClarificationQuestionsMessage(
+    taskId: string,
+    questions: string[],
+  ): string {
+    return (
+      `*I need some clarification before dispatching your task*\n\n` +
       questions.map((q, i) => `${i + 1}. ${q}`).join('\n') +
-      '\n\n_Please reply to this thread with your answers (one message is fine)._';
+      '\n\n_Please reply to this thread with your answers (one message is fine)._'
+    );
   }
 }
