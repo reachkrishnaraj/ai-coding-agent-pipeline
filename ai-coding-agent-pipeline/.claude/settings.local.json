@@ -47,7 +47,11 @@
       "Bash(wc:*)",
       "Bash(find:*)",
       "Bash(~/.zshrc)",
-      "Bash(pgrep:*)"
+      "Bash(pgrep:*)",
+      "Bash(/usr/local/bin/docker info)",
+      "Bash(/usr/local/bin/docker version:*)",
+      "Bash(/usr/local/bin/docker compose up:*)",
+      "Bash(export PATH=\"/usr/local/bin:$PATH\")"
     ]
   }
 }
