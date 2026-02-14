@@ -1,0 +1,262 @@
+{
+  "name": "AI Pipeline — Core Logic (Sub-workflow)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "sub-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\n\nlet task = {};\n\n// CASE 0: Form trigger — fields come with 'Task Description' key\nif (body['Task Description'] || body.taskDescription) {\n  const desc = body['Task Description'] || body.taskDescription;\n  const taskType = body['Task Type'] || body.taskType || '';\n  const repo = body['Repository'] || body.repo || '';\n  const files = body['Files or Modules'] || body.filesModules || '';\n  const ac = body['Acceptance Criteria'] || body.acceptanceCriteria || '';\n  const priority = body['Priority'] || body.priority || 'normal';\n  task = {\n    source: 'form',\n    title: desc.substring(0, 100),\n    description: desc,\n    type: (!taskType || taskType === 'auto-detect') ? null : taskType.trim(),\n    files: files ? files.split(',').map(f => f.trim()).filter(Boolean) : [],\n    acceptanceCriteria: ac,\n    slackUserId: '',\n    asanaGid: null,\n    repo: repo || 'mothership/finance-service',\n    priority: priority || 'normal',\n  };\n}\n// CASE 1: Plain text string — free-form input\nelse if (typeof body === 'string' || (typeof body.text === 'string' && !body.user && !body.gid)) {\n  const rawText = typeof body === 'string' ? body : body.text;\n  task = {\n    source: 'freeform',\n    title: rawText.substring(0, 100),\n    description: rawText,\n    type: null,\n    files: [],\n    slackUserId: '',\n    asanaGid: null,\n    repo: body.repo || 'mothership/finance-service',\n  };\n}\n// CASE 2: Slack trigger (has user ID)\nelse if (body.text && body.user) {\n  task = {\n    source: 'slack',\n    title: body.text.substring(0, 100),\n    description: body.text,\n    slackUserId: body.user,\n    slackThreadTs: body.ts || null,\n    asanaGid: null,\n    repo: body.repo || 'mothership/finance-service',\n  };\n}\n// CASE 3: Asana trigger\nelse if (body.gid) {\n  task = {\n    source: 'asana',\n    title: body.name,\n    description: body.notes || body.html_notes || '',\n    asanaGid: body.gid,\n    slackUserId: body.slackUserId || '',\n    repo: body.repo || 'mothership/finance-service',\n    acceptanceCriteria: body.custom_fields\n      ?.find(f => f.name === 'Acceptance Criteria')?.text_value || '',\n    moduleArea: body.custom_fields\n      ?.find(f => f.name === 'Module' || f.name === 'Area')?.text_value || '',\n  };\n}\n// CASE 4: Structured webhook JSON\nelse {\n  task = {\n    source: body.source || 'webhook',\n    title: body.title || body.description?.substring(0, 100) || 'Untitled task',\n    description: body.description || body.title || '',\n    type: body.type || null,\n    files: body.files || [],\n    acceptanceCriteria: body.acceptanceCriteria || '',\n    slackUserId: body.slackUserId || '',\n    asanaGid: null,\n    repo: body.repo || 'mothership/finance-service',\n  };\n}\n\nreturn { json: task };"
+      },
+      "id": "normalize-input",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"model\": \"gpt-4o\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a senior engineering lead reviewing tasks before they go to an AI coding agent. The agent works on Mothership microservices — primarily the Finance Service (NestJS/TypeScript, CQRS architecture, Prisma ORM, Vitest testing, Biome linting). It handles customer payments, invoices, refunds, vendor bills, Stripe integration, and NetSuite sync.\\n\\nYour job:\\n1. Analyze the task for clarity and completeness\\n2. Identify any ambiguities, missing acceptance criteria, or unclear scope\\n3. Generate clarifying questions if needed (max 3 questions)\\n4. Classify the task type: bug-fix, feature, refactor, or test-coverage\\n5. Recommend which agent should handle it: claude-code (complex), codex (quick generation), or copilot (simple bugs)\\n6. Extract or infer the target repo (default: mothership/finance-service)\\n\\nRespond in this exact JSON format only — no markdown, no explanation:\\n{\\n  \\\"clear_enough\\\": true/false,\\n  \\\"questions\\\": [\\\"question 1\\\", \\\"question 2\\\"],\\n  \\\"task_type\\\": \\\"bug-fix|feature|refactor|test-coverage\\\",\\n  \\\"recommended_agent\\\": \\\"claude-code|codex|copilot\\\",\\n  \\\"summary\\\": \\\"One-sentence summary of what needs to be done\\\",\\n  \\\"suggested_acceptance_criteria\\\": [\\\"criterion 1\\\", \\\"criterion 2\\\"],\\n  \\\"likely_files\\\": [\\\"src/modules/...\\\", \\\"src/libs/...\\\"],\\n  \\\"repo\\\": \\\"mothership/finance-service\\\"\\n}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Task title: \" + $json.title + \"\\n\\nTask description:\\n\" + $json.description + \"\\n\\n\" + ($json.acceptanceCriteria ? \"Acceptance criteria: \" + $json.acceptanceCriteria + \"\\n\" : \"\") + ($json.moduleArea ? \"Module/Area: \" + $json.moduleArea + \"\\n\" : \"\") + ($json.files && $json.files.length ? \"Files mentioned: \" + $json.files.join(\", \") + \"\\n\" : \"\") + ($json.type ? \"Suggested type: \" + $json.type + \"\\n\" : \"\") + \"Target repo: \" + $json.repo\n    }\n  ]\n} }}",
+        "options": {}
+      },
+      "id": "llm-analyze",
+      "name": "LLM — Analyze Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\nlet analysis;\ntry {\n  // OpenAI format: choices[0].message.content\n  const text = response.choices[0].message.content;\n  const cleaned = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  analysis = JSON.parse(cleaned);\n} catch (e) {\n  analysis = {\n    clear_enough: false,\n    questions: ['Could you provide more details about this task?'],\n    task_type: 'bug-fix',\n    recommended_agent: 'claude-code',\n    summary: response.choices?.[0]?.message?.content || 'Unable to parse task',\n    suggested_acceptance_criteria: [],\n    likely_files: [],\n    repo: 'mothership/finance-service',\n  };\n}\n\nconst prevData = $('Normalize Input').first().json;\n\nreturn {\n  json: {\n    ...prevData,\n    ...analysis,\n    repo: analysis.repo || prevData.repo || 'mothership/finance-service',\n    title: analysis.summary || prevData.title,\n    original_title: prevData.title,\n    original_description: prevData.description,\n  }\n};"
+      },
+      "id": "parse-analysis",
+      "name": "Parse LLM Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-questions",
+              "leftValue": "={{ $json.clear_enough }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-has-questions",
+      "name": "Has Questions?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// PLACEHOLDER: When Slack is ready, replace this with Slack message node\nconst task = $input.first().json;\n\nconsole.log('Questions for user:', task.questions);\nconsole.log('Proceeding without Slack Q&A (Slack pending approval)');\n\nreturn {\n  json: {\n    ...task,\n    clear_enough: true,\n    _skipped_slack_qa: true,\n    _questions_that_would_be_asked: task.questions,\n  }\n};"
+      },
+      "id": "slack-qa-placeholder",
+      "name": "Slack Q&A (Placeholder)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const task = $input.first().json;\n\nconst repoParts = (task.repo || 'mothership/finance-service').split('/');\nconst owner = repoParts[0];\nconst repoName = repoParts[1];\n\nconst issueBody = `## Task\n${task.summary || task.title}\n\n## Description\n${task.original_description || task.description}\n\n## Acceptance Criteria\n${(task.acceptance_criteria || task.suggested_acceptance_criteria || [])\n  .map(c => ` - [ ] ${c}`).join('\\n') || '- [ ] TBD'}\n\n## Likely Files\n${(task.likely_files || []).map(f => `- \\`${f}\\``).join('\\n') || '- TBD'}\n\n## Agent Instructions\n- Task type: **${task.task_type}**\n- Read prompt template: \\`.ai/prompts/${task.task_type}.md\\`\n- This task has been pre-clarified. All questions have been answered.\n- Proceed directly to implementation. Do NOT ask clarifying questions.\n\n## Scope\n- Only modify files related to this task\n- All existing tests must continue to pass\n- Add tests for any new functionality\n- Follow conventions in CLAUDE.md\n\n${task.asanaGid ? `## Asana\\nID: ${task.asanaGid}\\nURL: https://app.asana.com/0/0/${task.asanaGid}` : ''}\n\n${task._skipped_slack_qa ? `## Note\\nSlack Q&A was skipped. The following questions were identified but not asked:\\n${(task._questions_that_would_be_asked || []).map((q, i) => `${i+1}. ${q}`).join('\\n')}\\nAgent: Please ask these as issue comments before proceeding.` : ''}\n\n---\n*This issue was created by the AI Pipeline via n8n. Task source: ${task.source}*`;\n\nconst labels = ['ai-task'];\nif (task.task_type) labels.push(task.task_type);\nif (task.recommended_agent === 'codex') labels.push('codex');\n\nreturn {\n  json: {\n    owner,\n    repoName,\n    title: task.summary || task.title,\n    body: issueBody,\n    labels,\n    agent: task.recommended_agent,\n    asanaGid: task.asanaGid,\n    source: task.source,\n    slackUserId: task.slackUserId,\n    repo: task.repo,\n    task_type: task.task_type,\n  }\n};"
+      },
+      "id": "build-issue",
+      "name": "Build GitHub Issue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $json.owner }}/{{ $json.repoName }}/issues",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+v3+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": {{ JSON.stringify($json.title) }},\n  \"body\": {{ JSON.stringify($json.body) }},\n  \"labels\": {{ JSON.stringify($json.labels) }}\n}",
+        "options": {}
+      },
+      "id": "create-github-issue",
+      "name": "Create GitHub Issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 300],
+      "credentials": {
+        "githubApi": {
+          "id": "",
+          "name": ""
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const issue = $input.first().json;\nconst buildData = $('Build GitHub Issue').first().json;\n\nreturn {\n  json: {\n    status: 'dispatched',\n    issue_url: issue.html_url,\n    issue_number: issue.number,\n    title: buildData.title,\n    agent: buildData.agent,\n    task_type: buildData.task_type,\n    repo: buildData.repo,\n    source: buildData.source,\n  }\n};"
+      },
+      "id": "prepare-output",
+      "name": "Prepare Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "LLM — Analyze Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM — Analyze Task": {
+      "main": [
+        [
+          {
+            "node": "Parse LLM Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse LLM Response": {
+      "main": [
+        [
+          {
+            "node": "Has Questions?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Questions?": {
+      "main": [
+        [
+          {
+            "node": "Slack Q&A (Placeholder)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build GitHub Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Q&A (Placeholder)": {
+      "main": [
+        [
+          {
+            "node": "Build GitHub Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build GitHub Issue": {
+      "main": [
+        [
+          {
+            "node": "Create GitHub Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create GitHub Issue": {
+      "main": [
+        [
+          {
+            "node": "Prepare Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "ai-pipeline"
+    }
+  ]
+}

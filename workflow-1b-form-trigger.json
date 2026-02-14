@@ -1,0 +1,116 @@
+{
+  "name": "AI Pipeline — Form (Browser)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "AI Coding Pipeline — Submit Task",
+        "formDescription": "Describe what you need and the AI agent will analyze, clarify, and code it.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Task Description",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "e.g. Fix the payment status bug where it stays in Processing after Stripe webhook fires"
+            },
+            {
+              "fieldLabel": "Task Type",
+              "fieldType": "text",
+              "placeholder": "bug-fix, feature, refactor, or test-coverage (leave blank for auto-detect)"
+            },
+            {
+              "fieldLabel": "Repository",
+              "fieldType": "text",
+              "placeholder": "mothership/finance-service (default if blank)"
+            },
+            {
+              "fieldLabel": "Files or Modules",
+              "fieldType": "text",
+              "placeholder": "e.g. src/modules/customer-payment/, src/apps/events-worker/"
+            },
+            {
+              "fieldLabel": "Acceptance Criteria",
+              "fieldType": "textarea",
+              "placeholder": "What does 'done' look like? e.g. Payment status updates to Succeeded, succeededAt is set"
+            },
+            {
+              "fieldLabel": "Priority",
+              "fieldType": "text",
+              "placeholder": "normal or urgent (default: normal)"
+            }
+          ]
+        },
+        "options": {
+          "respondWithData": false
+        }
+      },
+      "id": "form-trigger",
+      "name": "Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [240, 300],
+      "webhookId": "ai-task-form"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": ""
+        },
+        "options": {}
+      },
+      "id": "call-core-logic",
+      "name": "Run Core Logic",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Task Dispatched",
+        "completionMessage": "=Your task has been sent to the AI coding agent.\n\nTask: {{ $json.title }}\nAgent: {{ $json.agent }}\nRepo: {{ $json.repo }}\nGitHub Issue: {{ $json.issue_url }}\n\nYou'll be notified when the PR is ready.",
+        "options": {}
+      },
+      "id": "form-ending",
+      "name": "Form Ending",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 1,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "Run Core Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Core Logic": {
+      "main": [
+        [
+          {
+            "node": "Form Ending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "ai-pipeline"
+    }
+  ]
+}

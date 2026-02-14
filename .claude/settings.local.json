@@ -1,0 +1,45 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)",
+      "Bash(git merge:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git stash:*)",
+      "Bash(pnpm:*)",
+      "Bash(npx:*)",
+      "Bash(npm:*)",
+      "Bash(node:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(rm:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(code:*)",
+      "Bash(open -a \"Visual Studio Code\":*)",
+      "Bash(prisma:*)",
+      "Bash(npx prisma:*)",
+      "Bash(docker:*)",
+      "Bash(docker-compose:*)",
+      "WebFetch(domain:community.n8n.io)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.n8n.io)",
+      "WebFetch(domain:docs.nestjs.com)",
+      "WebFetch(domain:www.prisma.io)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:api.slack.com)",
+      "WebFetch(domain:railway.docs.com)",
+      "Bash(git init:*)"
+    ]
+  }
+}

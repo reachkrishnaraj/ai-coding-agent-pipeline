@@ -1,0 +1,13 @@
+{
+  "_NOTE": "THIS FILE IS DEPRECATED. n8n cannot have Form Trigger + Respond to Webhook in the same workflow (confirmed platform limitation, GitHub issue #21289). The workflow has been split into 3 files:",
+  "_FILES": {
+    "workflow-1a-core-logic.json": "Sub-workflow with all shared logic (Normalize → Claude Analyze → Build Issue → Create GitHub Issue). Import FIRST.",
+    "workflow-1b-form-trigger.json": "Form Trigger → calls Core Logic sub-workflow → Form Ending. For browser-based task submission.",
+    "workflow-1c-webhook-trigger.json": "Webhook Trigger → calls Core Logic sub-workflow → Respond to Webhook. For curl/API task submission."
+  },
+  "_SETUP_ORDER": [
+    "1. Import workflow-1a-core-logic.json → Activate it",
+    "2. Import workflow-1b-form-trigger.json → Open 'Run Core Logic' node → select the Core Logic sub-workflow from the dropdown → Activate",
+    "3. Import workflow-1c-webhook-trigger.json → Open 'Run Core Logic' node → select the Core Logic sub-workflow from the dropdown → Activate"
+  ]
+}
