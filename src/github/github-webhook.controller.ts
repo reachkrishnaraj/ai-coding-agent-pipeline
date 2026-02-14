@@ -8,6 +8,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
+import { SlackNotificationService } from '../slack/slack-notification.service';
+import { TaskStatus } from '@prisma/client';
 import * as crypto from 'crypto';
 
 interface WebhookPayload {
@@ -42,7 +45,11 @@ export class GitHubWebhookController {
   private readonly logger = new Logger(GitHubWebhookController.name);
   private readonly webhookSecret: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
+    private readonly slackNotificationService: SlackNotificationService,
+  ) {
     this.webhookSecret =
       this.configService.get<string>('GITHUB_WEBHOOK_SECRET') || '';
   }
@@ -90,7 +97,7 @@ export class GitHubWebhookController {
    * Handle pull request events (opened, merged, closed)
    */
   private async handlePullRequestEvent(payload: WebhookPayload) {
-    const { action, pull_request } = payload;
+    const { action, pull_request, repository } = payload;
 
     if (!pull_request) {
       return;
@@ -100,29 +107,36 @@ export class GitHubWebhookController {
       `PR #${pull_request.number} ${action} by ${pull_request.user.login}`,
     );
 
-    // TODO: Find task by issue number from PR body
-    // TODO: Update task status based on action
+    // Find task by extracting issue number from PR body
+    const issueNumber = this.extractIssueNumberFromPRBody(pull_request.body);
+
+    if (!issueNumber) {
+      this.logger.debug('No issue reference found in PR body');
+      return;
+    }
+
+    const task = await this.prisma.task.findFirst({
+      where: {
+        githubIssueNumber: issueNumber,
+        repo: repository?.full_name,
+      },
+    });
+
+    if (!task) {
+      this.logger.warn(`No task found for issue #${issueNumber}`);
+      return;
+    }
 
     switch (action) {
       case 'opened':
-        // Extract issue number from PR body if it references an issue
-        // Update task status to 'pr_open'
-        this.logger.log(
-          `PR opened: ${pull_request.html_url} - would update task status to pr_open`,
-        );
+        await this.handlePROpened(task, pull_request);
         break;
 
       case 'closed':
         if (pull_request.merged) {
-          // Update task status to 'merged'
-          this.logger.log(
-            `PR merged: ${pull_request.html_url} - would update task status to merged`,
-          );
+          await this.handlePRMerged(task, pull_request);
         } else {
-          // Update task status to 'failed'
-          this.logger.log(
-            `PR closed without merge: ${pull_request.html_url} - would update task status to failed`,
-          );
+          await this.handlePRClosed(task, pull_request);
         }
         break;
 
@@ -131,11 +145,116 @@ export class GitHubWebhookController {
     }
   }
 
+  private async handlePROpened(task: any, pullRequest: any) {
+    await this.prisma.task.update({
+      where: { id: task.id },
+      data: {
+        status: TaskStatus.pr_open,
+        githubPrNumber: pullRequest.number,
+        githubPrUrl: pullRequest.html_url,
+        githubPrStatus: 'open',
+      },
+    });
+
+    await this.prisma.taskEvent.create({
+      data: {
+        taskId: task.id,
+        eventType: 'pr_opened',
+        payload: {
+          prNumber: pullRequest.number,
+          prUrl: pullRequest.html_url,
+        },
+      },
+    });
+
+    this.logger.log(`Task ${task.id} updated to pr_open`);
+
+    // Send Slack notification
+    await this.slackNotificationService.notifyPROpened(task.id);
+  }
+
+  private async handlePRMerged(task: any, pullRequest: any) {
+    await this.prisma.task.update({
+      where: { id: task.id },
+      data: {
+        status: TaskStatus.merged,
+        githubPrStatus: 'merged',
+        completedAt: new Date(),
+      },
+    });
+
+    await this.prisma.taskEvent.create({
+      data: {
+        taskId: task.id,
+        eventType: 'pr_merged',
+        payload: {
+          prNumber: pullRequest.number,
+          prUrl: pullRequest.html_url,
+        },
+      },
+    });
+
+    this.logger.log(`Task ${task.id} completed and merged`);
+
+    // Send Slack notification
+    await this.slackNotificationService.notifyPRMerged(task.id);
+  }
+
+  private async handlePRClosed(task: any, pullRequest: any) {
+    await this.prisma.task.update({
+      where: { id: task.id },
+      data: {
+        status: TaskStatus.failed,
+        githubPrStatus: 'closed',
+      },
+    });
+
+    await this.prisma.taskEvent.create({
+      data: {
+        taskId: task.id,
+        eventType: 'pr_closed',
+        payload: {
+          prNumber: pullRequest.number,
+          prUrl: pullRequest.html_url,
+        },
+      },
+    });
+
+    this.logger.log(`Task ${task.id} failed - PR closed without merge`);
+
+    // Send Slack notification
+    await this.slackNotificationService.notifyPRClosed(task.id);
+  }
+
+  /**
+   * Extract issue number from PR body
+   * Looks for patterns like "Closes #123", "Fixes #123", etc.
+   */
+  private extractIssueNumberFromPRBody(body?: string): number | null {
+    if (!body) {
+      return null;
+    }
+
+    const patterns = [
+      /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/i,
+      /#(\d+)/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = body.match(pattern);
+      if (match) {
+        return parseInt(match[1], 10);
+      }
+    }
+
+    return null;
+  }
+
   /**
    * Handle issue comment events (agent asking questions)
    */
   private async handleIssueCommentEvent(payload: WebhookPayload) {
-    const { action, issue, comment } = payload;
+    const { action, issue, comment, repository } = payload;
 
     if (!issue || !comment || action !== 'created') {
       return;
@@ -150,8 +269,31 @@ export class GitHubWebhookController {
       this.logger.log(
         `Agent comment on issue #${issue.number}: ${comment.body.slice(0, 50)}...`,
       );
-      // TODO: Relay to Slack (will be implemented in Session D)
-      // TODO: Log event to task_events
+
+      // Find task by issue number
+      const task = await this.prisma.task.findFirst({
+        where: {
+          githubIssueNumber: issue.number,
+          repo: repository?.full_name,
+        },
+      });
+
+      if (task) {
+        // Log event
+        await this.prisma.taskEvent.create({
+          data: {
+            taskId: task.id,
+            eventType: 'agent_question',
+            payload: {
+              comment: comment.body,
+              issueUrl: issue.html_url,
+            },
+          },
+        });
+
+        // Send Slack notification
+        await this.slackNotificationService.notifyAgentQuestion(task.id);
+      }
     }
   }
 

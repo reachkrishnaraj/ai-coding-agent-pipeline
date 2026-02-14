@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   Inject,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -18,6 +19,7 @@ export class TasksService {
     private readonly prisma: PrismaService,
     @Inject('ILlmService') private readonly llmService: ILlmService,
     @Inject('IGitHubService') private readonly githubService: IGitHubService,
+    @Optional() @Inject('SlackNotificationService') private readonly slackNotificationService?: any,
   ) {}
 
   // State machine: valid transitions
@@ -261,6 +263,11 @@ export class TasksService {
       issueNumber: issue.issueNumber,
       issueUrl: issue.htmlUrl,
     });
+
+    // Send Slack notification if available
+    if (this.slackNotificationService) {
+      await this.slackNotificationService.notifyTaskDispatched(taskId);
+    }
 
     return {
       ...updatedTask,
