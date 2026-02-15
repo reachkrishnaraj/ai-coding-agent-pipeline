@@ -108,12 +108,15 @@ export class SlackWebhookController {
     const targetUserId =
       this.configService.get<string>('SLACK_TEST_USER_ID') || payload.user_id;
 
+    // Get display name for author field
+    const displayName = await this.slackService.getUserDisplayName(targetUserId);
+
     try {
       // Create task via TasksService
       const task = await this.tasksService.create({
         description,
         source: 'slack',
-        createdBy: targetUserId,
+        createdBy: displayName,
         repo:
           this.configService.get<string>('DEFAULT_REPO') ||
           'mothership/finance-service',

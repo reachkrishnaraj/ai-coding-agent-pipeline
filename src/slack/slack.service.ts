@@ -18,6 +18,36 @@ export class SlackService {
   }
 
   /**
+   * Get user display name from Slack user ID
+   */
+  async getUserDisplayName(slackUserId: string): Promise<string> {
+    try {
+      if (!this.configService.get<string>('SLACK_BOT_TOKEN')) {
+        return slackUserId;
+      }
+
+      const result = await this.client.users.info({ user: slackUserId });
+
+      if (result.ok && result.user) {
+        // Prefer display_name, fall back to real_name, then name
+        return (
+          result.user.profile?.display_name ||
+          result.user.real_name ||
+          result.user.name ||
+          slackUserId
+        );
+      }
+
+      return slackUserId;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to get user info for ${slackUserId}: ${error.message}`,
+      );
+      return slackUserId;
+    }
+  }
+
+  /**
    * Send a direct message to a Slack user
    */
   async sendDM(slackUserId: string, text: string): Promise<string | null> {

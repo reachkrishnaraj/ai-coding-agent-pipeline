@@ -31,6 +31,9 @@ export function TaskList({ tasks }: TaskListProps) {
               Title
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Author
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Repo
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -57,6 +60,9 @@ export function TaskList({ tasks }: TaskListProps) {
                 >
                   {task.llmSummary || task.description.slice(0, 60) + '...'}
                 </Link>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {task.createdBy || '-'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {task.repo}

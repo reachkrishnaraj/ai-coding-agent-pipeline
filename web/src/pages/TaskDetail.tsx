@@ -12,6 +12,8 @@ export function TaskDetail() {
   const [events, setEvents] = useState<TaskEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [answers, setAnswers] = useState<string[]>([]);
 
   const loadTask = async () => {
     if (!id) return;
@@ -20,6 +22,10 @@ export function TaskDetail() {
       const response = await api.tasks.get(id);
       setTask(response);
       setEvents(response.events || []);
+      // Initialize answers array based on questions
+      if (response.clarificationQuestions && response.status === 'needs_clarification') {
+        setAnswers(new Array(response.clarificationQuestions.length).fill(''));
+      }
     } catch (error) {
       console.error('Failed to load task:', error);
     } finally {
@@ -29,6 +35,9 @@ export function TaskDetail() {
 
   useEffect(() => {
     loadTask();
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(loadTask, 10000);
+    return () => clearInterval(interval);
   }, [id]);
 
   const handleRetry = async () => {
@@ -42,6 +51,27 @@ export function TaskDetail() {
       console.error('Failed to retry task:', error);
     } finally {
       setRetrying(false);
+    }
+  };
+
+  const handleSubmitAnswers = async () => {
+    if (!id || !task) return;
+
+    // Validate all answers are filled
+    if (answers.some((a) => !a.trim())) {
+      alert('Please answer all questions');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.tasks.clarify(id, { answers });
+      await loadTask();
+    } catch (error) {
+      console.error('Failed to submit answers:', error);
+      alert('Failed to submit answers. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -123,6 +153,20 @@ export function TaskDetail() {
               <dd className="mt-1 text-sm text-gray-900">{task.priority}</dd>
             </div>
 
+            {task.createdBy && (
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Author</dt>
+                <dd className="mt-1 text-sm text-gray-900">{task.createdBy}</dd>
+              </div>
+            )}
+
+            {task.source && (
+              <div>
+                <dt className="text-sm font-medium text-gray-500">Source</dt>
+                <dd className="mt-1 text-sm text-gray-900 capitalize">{task.source}</dd>
+              </div>
+            )}
+
             {task.githubIssueUrl && (
               <div>
                 <dt className="text-sm font-medium text-gray-500">
@@ -185,25 +229,58 @@ export function TaskDetail() {
               </div>
             )}
 
+            {/* Clarification Q&A - Show form if needs_clarification, otherwise show answered */}
             {task.clarificationQuestions &&
               task.clarificationQuestions.length > 0 && (
                 <div className="sm:col-span-2">
                   <dt className="text-sm font-medium text-gray-500 mb-3">
-                    Clarification Q&A
+                    Clarification Questions
                   </dt>
                   <dd className="space-y-4">
-                    {task.clarificationQuestions.map((question, idx) => (
-                      <div key={idx} className="border-l-4 border-gray-300 pl-4">
-                        <p className="text-sm font-medium text-gray-900">
-                          Q: {question}
-                        </p>
-                        {task.clarificationAnswers?.[idx] && (
-                          <p className="mt-1 text-sm text-gray-600">
-                            A: {task.clarificationAnswers[idx]}
+                    {task.status === 'needs_clarification' ? (
+                      // Show editable form
+                      <>
+                        {task.clarificationQuestions.map((question, idx) => (
+                          <div key={idx} className="border-l-4 border-yellow-400 pl-4 py-2 bg-yellow-50 rounded-r">
+                            <p className="text-sm font-medium text-gray-900 mb-2">
+                              Q{idx + 1}: {question}
+                            </p>
+                            <textarea
+                              value={answers[idx] || ''}
+                              onChange={(e) => {
+                                const newAnswers = [...answers];
+                                newAnswers[idx] = e.target.value;
+                                setAnswers(newAnswers);
+                              }}
+                              placeholder="Type your answer here..."
+                              rows={2}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            />
+                          </div>
+                        ))}
+                        <button
+                          onClick={handleSubmitAnswers}
+                          disabled={submitting}
+                          className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {submitting ? 'Submitting...' : 'Submit Answers'}
+                        </button>
+                      </>
+                    ) : (
+                      // Show answered Q&A
+                      task.clarificationQuestions.map((question, idx) => (
+                        <div key={idx} className="border-l-4 border-green-400 pl-4">
+                          <p className="text-sm font-medium text-gray-900">
+                            Q: {question}
                           </p>
-                        )}
-                      </div>
-                    ))}
+                          {task.clarificationAnswers?.[idx] && (
+                            <p className="mt-1 text-sm text-gray-600">
+                              A: {task.clarificationAnswers[idx]}
+                            </p>
+                          )}
+                        </div>
+                      ))
+                    )}
                   </dd>
                 </div>
               )}
