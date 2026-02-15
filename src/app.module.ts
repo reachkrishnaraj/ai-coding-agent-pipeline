@@ -17,7 +17,8 @@ import { SlackModule } from './slack/slack.module';
     }),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'web', 'dist'),
-      exclude: ['/api*'],
+      exclude: ['/api/(.*)'],
+      serveRoot: '/',
     }),
     DatabaseModule,
     TasksModule,

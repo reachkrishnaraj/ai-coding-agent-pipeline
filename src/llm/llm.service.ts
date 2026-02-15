@@ -145,8 +145,8 @@ export class LlmService {
       parts.push(`Target Repository: ${task.repo}`);
     }
 
-    if (task.files_hint) {
-      parts.push(`Files/Modules to Focus On: ${task.files_hint}`);
+    if (task.files_hint?.length) {
+      parts.push(`Files/Modules to Focus On: ${task.files_hint.join(', ')}`);
     }
 
     if (task.acceptance_criteria) {
@@ -221,9 +221,7 @@ export class LlmService {
         task.description.slice(0, 100) +
         (task.description.length > 100 ? '...' : ''),
       suggested_acceptance_criteria: [],
-      likely_files: task.files_hint
-        ? task.files_hint.split(',').map((f) => f.trim())
-        : [],
+      likely_files: task.files_hint?.length ? task.files_hint : [],
       repo: task.repo,
     };
   }

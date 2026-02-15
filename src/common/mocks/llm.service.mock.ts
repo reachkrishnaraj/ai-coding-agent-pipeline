@@ -8,7 +8,7 @@ export class LlmServiceMock implements ILlmService {
     description: string;
     task_type_hint?: string;
     repo?: string;
-    files_hint?: string;
+    files_hint?: string[];
     acceptance_criteria?: string;
   }): Promise<LlmAnalysis> {
     // Mock implementation for testing
@@ -34,8 +34,8 @@ export class LlmServiceMock implements ILlmService {
         'All existing tests pass',
         'New functionality is tested',
       ],
-      likely_files: task.files_hint
-        ? task.files_hint.split(',').map((f) => f.trim())
+      likely_files: task.files_hint?.length
+        ? task.files_hint
         : ['src/modules/example/'],
       repo: task.repo || 'mothership/finance-service',
     };

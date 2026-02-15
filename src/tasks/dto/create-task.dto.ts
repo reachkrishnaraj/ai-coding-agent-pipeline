@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsIn, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsIn,
+  IsNotEmpty,
+  IsArray,
+} from 'class-validator';
 
 export class CreateTaskDto {
   @IsString()
@@ -14,9 +20,10 @@ export class CreateTaskDto {
   @IsOptional()
   repo?: string;
 
-  @IsString()
+  @IsArray()
+  @IsString({ each: true })
   @IsOptional()
-  files?: string;
+  files?: string[];
 
   @IsString()
   @IsOptional()

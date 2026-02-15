@@ -76,18 +76,18 @@ export function TaskDetail() {
         <div className="px-4 py-5 sm:px-6 flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {task.llm_summary || 'Task Details'}
+              {task.llmSummary || 'Task Details'}
             </h1>
             <div className="mt-2 flex items-center space-x-3">
               <StatusBadge status={task.status} />
-              {task.recommended_agent && (
+              {task.recommendedAgent && (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {task.recommended_agent}
+                  {task.recommendedAgent}
                 </span>
               )}
-              {task.task_type && (
+              {task.taskType && (
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                  {task.task_type}
+                  {task.taskType}
                 </span>
               )}
             </div>
@@ -123,61 +123,61 @@ export function TaskDetail() {
               <dd className="mt-1 text-sm text-gray-900">{task.priority}</dd>
             </div>
 
-            {task.github_issue_url && (
+            {task.githubIssueUrl && (
               <div>
                 <dt className="text-sm font-medium text-gray-500">
                   GitHub Issue
                 </dt>
                 <dd className="mt-1 text-sm">
                   <a
-                    href={task.github_issue_url}
+                    href={task.githubIssueUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-indigo-600 hover:text-indigo-900"
                   >
-                    #{task.github_issue_number}
+                    #{task.githubIssueNumber}
                   </a>
                 </dd>
               </div>
             )}
 
-            {task.github_pr_url && (
+            {task.githubPrUrl && (
               <div>
                 <dt className="text-sm font-medium text-gray-500">
                   Pull Request
                 </dt>
                 <dd className="mt-1 text-sm">
                   <a
-                    href={task.github_pr_url}
+                    href={task.githubPrUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-indigo-600 hover:text-indigo-900"
                   >
-                    #{task.github_pr_number} ({task.github_pr_status})
+                    #{task.githubPrNumber} ({task.githubPrStatus})
                   </a>
                 </dd>
               </div>
             )}
 
-            {task.acceptance_criteria && (
+            {task.acceptanceCriteria && (
               <div className="sm:col-span-2">
                 <dt className="text-sm font-medium text-gray-500">
                   Acceptance Criteria
                 </dt>
                 <dd className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
-                  {task.acceptance_criteria}
+                  {task.acceptanceCriteria}
                 </dd>
               </div>
             )}
 
-            {task.likely_files && task.likely_files.length > 0 && (
+            {task.likelyFiles && task.likelyFiles.length > 0 && (
               <div className="sm:col-span-2">
                 <dt className="text-sm font-medium text-gray-500">
                   Likely Files
                 </dt>
                 <dd className="mt-1">
                   <ul className="list-disc list-inside text-sm text-gray-900">
-                    {task.likely_files.map((file, idx) => (
+                    {task.likelyFiles.map((file, idx) => (
                       <li key={idx}>{file}</li>
                     ))}
                   </ul>
@@ -185,21 +185,21 @@ export function TaskDetail() {
               </div>
             )}
 
-            {task.clarification_questions &&
-              task.clarification_questions.length > 0 && (
+            {task.clarificationQuestions &&
+              task.clarificationQuestions.length > 0 && (
                 <div className="sm:col-span-2">
                   <dt className="text-sm font-medium text-gray-500 mb-3">
                     Clarification Q&A
                   </dt>
                   <dd className="space-y-4">
-                    {task.clarification_questions.map((question, idx) => (
+                    {task.clarificationQuestions.map((question, idx) => (
                       <div key={idx} className="border-l-4 border-gray-300 pl-4">
                         <p className="text-sm font-medium text-gray-900">
                           Q: {question}
                         </p>
-                        {task.clarification_answers?.[idx] && (
+                        {task.clarificationAnswers?.[idx] && (
                           <p className="mt-1 text-sm text-gray-600">
-                            A: {task.clarification_answers[idx]}
+                            A: {task.clarificationAnswers[idx]}
                           </p>
                         )}
                       </div>
@@ -208,11 +208,11 @@ export function TaskDetail() {
                 </div>
               )}
 
-            {task.error_message && (
+            {task.errorMessage && (
               <div className="sm:col-span-2">
                 <dt className="text-sm font-medium text-gray-500">Error</dt>
                 <dd className="mt-1 text-sm text-red-600 bg-red-50 p-3 rounded">
-                  {task.error_message}
+                  {task.errorMessage}
                 </dd>
               </div>
             )}

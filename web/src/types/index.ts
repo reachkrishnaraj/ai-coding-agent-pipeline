@@ -3,32 +3,33 @@ export interface Task {
   source: string;
   status: TaskStatus;
   description: string;
-  task_type_hint?: string;
+  taskTypeHint?: string;
   repo: string;
-  files_hint?: string;
-  acceptance_criteria?: string;
+  filesHint?: string[];
+  acceptanceCriteria?: string;
   priority: string;
-  llm_analysis?: any;
-  llm_summary?: string;
-  task_type?: string;
-  recommended_agent?: string;
-  likely_files?: string[];
-  suggested_criteria?: string[];
-  clarification_questions?: string[];
-  clarification_answers?: string[];
-  is_clarified: boolean;
-  github_issue_number?: number;
-  github_issue_url?: string;
-  github_pr_number?: number;
-  github_pr_url?: string;
-  github_pr_status?: string;
-  github_branch?: string;
-  created_by?: string;
-  created_at: string;
-  updated_at: string;
-  dispatched_at?: string;
-  completed_at?: string;
-  error_message?: string;
+  llmAnalysis?: any;
+  llmSummary?: string;
+  taskType?: string;
+  recommendedAgent?: string;
+  likelyFiles?: string[];
+  suggestedCriteria?: string[];
+  clarificationQuestions?: string[];
+  clarificationAnswers?: string[];
+  isClarified: boolean;
+  githubIssueNumber?: number;
+  githubIssueUrl?: string;
+  githubPrNumber?: number;
+  githubPrUrl?: string;
+  githubPrStatus?: string;
+  githubBranch?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  dispatchedAt?: string;
+  completedAt?: string;
+  errorMessage?: string;
+  events?: TaskEvent[];
 }
 
 export type TaskStatus =
@@ -43,10 +44,9 @@ export type TaskStatus =
 
 export interface TaskEvent {
   id: string;
-  task_id: string;
-  event_type: string;
+  eventType: string;
   payload?: any;
-  created_at: string;
+  createdAt: string;
 }
 
 export interface User {

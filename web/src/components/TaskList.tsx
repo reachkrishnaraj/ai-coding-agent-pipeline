@@ -55,20 +55,20 @@ export function TaskList({ tasks }: TaskListProps) {
                   to={`/tasks/${task.id}`}
                   className="text-indigo-600 hover:text-indigo-900 font-medium"
                 >
-                  {task.llm_summary || task.description.slice(0, 60) + '...'}
+                  {task.llmSummary || task.description.slice(0, 60) + '...'}
                 </Link>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {task.repo}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {task.recommended_agent || '-'}
+                {task.recommendedAgent || '-'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {task.task_type || '-'}
+                {task.taskType || '-'}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {formatDate(task.created_at)}
+                {formatDate(task.createdAt)}
               </td>
             </tr>
           ))}

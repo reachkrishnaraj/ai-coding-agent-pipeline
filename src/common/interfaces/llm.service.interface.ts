@@ -6,7 +6,7 @@ export interface ILlmService {
     description: string;
     task_type_hint?: string;
     repo?: string;
-    files_hint?: string;
+    files_hint?: string[];
     acceptance_criteria?: string;
     clarificationQA?: ClarificationQA[];
   }): Promise<LlmAnalysis>;

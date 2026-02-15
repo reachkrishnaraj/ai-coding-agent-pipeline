@@ -4,9 +4,11 @@ import { ValidationPipe } from '@nestjs/common';
 import session = require('express-session');
 import passport = require('passport');
 import { json, urlencoded } from 'express';
+import { join } from 'path';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Disable default body parser to use custom ones that preserve raw body
     bodyParser: false,
   });
@@ -61,6 +63,22 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // SPA fallback - serve index.html for any non-API route that doesn't match a static file
+  // This must be registered AFTER all other middleware and routes
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.use((req: any, res: any, next: any) => {
+    // Skip API routes
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    // Skip static files (assets, etc.)
+    if (req.path.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map)$/)) {
+      return next();
+    }
+    // Serve index.html for SPA routes
+    res.sendFile(join(__dirname, '..', 'web', 'dist', 'index.html'));
+  });
 
   await app.listen(process.env.PORT ?? 3000);
 }

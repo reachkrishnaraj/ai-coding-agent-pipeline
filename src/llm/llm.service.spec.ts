@@ -53,9 +53,7 @@ describe('LlmService', () => {
           task.description.slice(0, 100) +
           (task.description.length > 100 ? '...' : ''),
         suggested_acceptance_criteria: [],
-        likely_files: task.files_hint
-          ? task.files_hint.split(',').map((f) => f.trim())
-          : [],
+        likely_files: task.files_hint?.length ? task.files_hint : [],
         repo: task.repo,
       };
     };
@@ -177,8 +175,8 @@ describe('LlmService', () => {
         parts.push(`Target Repository: ${task.repo}`);
       }
 
-      if (task.files_hint) {
-        parts.push(`Files/Modules to Focus On: ${task.files_hint}`);
+      if (task.files_hint?.length) {
+        parts.push(`Files/Modules to Focus On: ${task.files_hint.join(', ')}`);
       }
 
       if (task.acceptance_criteria) {
@@ -197,7 +195,7 @@ describe('LlmService', () => {
         description: 'Fix payment bug',
         task_type_hint: 'bug-fix',
         repo: 'mothership/finance-service',
-        files_hint: 'src/payment.ts',
+        files_hint: ['src/payment.ts'],
         acceptance_criteria: 'Payment updates correctly',
         priority: 'urgent',
       };
@@ -246,9 +244,7 @@ describe('LlmService', () => {
           task.description.slice(0, 100) +
           (task.description.length > 100 ? '...' : ''),
         suggested_acceptance_criteria: [],
-        likely_files: task.files_hint
-          ? task.files_hint.split(',').map((f) => f.trim())
-          : [],
+        likely_files: task.files_hint?.length ? task.files_hint : [],
         repo: task.repo,
       };
     };
@@ -281,11 +277,11 @@ describe('LlmService', () => {
       expect(result.summary).toContain('...');
     });
 
-    it('should parse files_hint', () => {
+    it('should use files_hint array directly', () => {
       const task = {
         description: 'Test',
         repo: 'mothership/test',
-        files_hint: 'file1.ts, file2.ts, file3.ts',
+        files_hint: ['file1.ts', 'file2.ts', 'file3.ts'],
       };
 
       const result = getFallbackAnalysis(task);

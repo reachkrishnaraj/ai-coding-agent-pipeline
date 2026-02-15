@@ -23,8 +23,8 @@ export class Task {
   @Prop({ default: 'mothership/finance-service', index: true })
   repo: string;
 
-  @Prop()
-  filesHint?: string;
+  @Prop({ type: [String] })
+  filesHint?: string[];
 
   @Prop()
   acceptanceCriteria?: string;

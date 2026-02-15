@@ -5,5 +5,5 @@ import { AppService } from './app.service';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
-  // Root route removed - static files served by ServeStaticModule
+  // Static files and SPA routing handled by ServeStaticModule
 }

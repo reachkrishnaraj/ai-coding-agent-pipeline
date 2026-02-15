@@ -30,7 +30,7 @@ export function TaskTimeline({ events }: TaskTimelineProps) {
                 <div className="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
                   <div>
                     <p className="text-sm text-gray-500">
-                      {event.event_type.replace('_', ' ')}
+                      {event.eventType.replace('_', ' ')}
                     </p>
                     {event.payload && (
                       <pre className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded overflow-x-auto">
@@ -39,7 +39,7 @@ export function TaskTimeline({ events }: TaskTimelineProps) {
                     )}
                   </div>
                   <div className="whitespace-nowrap text-right text-sm text-gray-500">
-                    {formatDate(event.created_at)}
+                    {formatDate(event.createdAt)}
                   </div>
                 </div>
               </div>
