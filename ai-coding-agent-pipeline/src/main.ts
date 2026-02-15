@@ -3,9 +3,30 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import session = require('express-session');
 import passport = require('passport');
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    // Disable default body parser to use custom ones that preserve raw body
+    bodyParser: false,
+  });
+
+  // Custom body parsers that preserve raw body for webhook signature verification
+  app.use(
+    json({
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
+  app.use(
+    urlencoded({
+      extended: true,
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
 
   // Enable CORS for frontend
   app.enableCors({

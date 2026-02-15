@@ -6,7 +6,9 @@ import {
   BadRequestException,
   Logger,
   HttpCode,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { SlackService } from './slack.service';
 import { TasksService } from '../tasks/tasks.service';
@@ -54,14 +56,16 @@ export class SlackWebhookController {
   @Post()
   @HttpCode(200)
   async handleWebhook(
+    @Req() req: Request & { rawBody?: Buffer },
     @Body() body: any,
     @Headers('x-slack-signature') signature: string,
     @Headers('x-slack-request-timestamp') timestamp: string,
   ) {
+    // Get raw body for signature verification (preserved by custom body parser)
+    const rawBody = req.rawBody?.toString() || '';
+
     // Verify Slack signature
-    if (
-      !this.verifySlackSignature(JSON.stringify(body), signature, timestamp)
-    ) {
+    if (!this.verifySlackSignature(rawBody, signature, timestamp)) {
       this.logger.warn('Invalid Slack signature');
       throw new BadRequestException('Invalid signature');
     }
@@ -100,12 +104,16 @@ export class SlackWebhookController {
       };
     }
 
+    // Use test user ID if configured (for development/testing)
+    const targetUserId =
+      this.configService.get<string>('SLACK_TEST_USER_ID') || payload.user_id;
+
     try {
       // Create task via TasksService
       const task = await this.tasksService.create({
         description,
         source: 'slack',
-        createdBy: payload.user_id,
+        createdBy: targetUserId,
         repo:
           this.configService.get<string>('DEFAULT_REPO') ||
           'mothership/finance-service',
@@ -114,7 +122,7 @@ export class SlackWebhookController {
       // Store Slack user ID on the task
       await this.tasksService.updateSlackInfo(
         task.id,
-        payload.user_id,
+        targetUserId,
         payload.channel_id,
       );
 
@@ -124,7 +132,7 @@ export class SlackWebhookController {
 
         // Send questions as DM thread
         const threadTs = await this.slackService.sendClarificationQuestions(
-          payload.user_id,
+          targetUserId,
           task.id,
           questions,
         );

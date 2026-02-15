@@ -27,8 +27,22 @@ export class SlackService {
         return null;
       }
 
+      // First, open a conversation with the user to get the DM channel ID
+      const conversationResult = await this.client.conversations.open({
+        users: slackUserId,
+      });
+
+      if (!conversationResult.ok || !conversationResult.channel?.id) {
+        this.logger.error(
+          `Failed to open conversation with ${slackUserId}: ${conversationResult.error}`,
+        );
+        return null;
+      }
+
+      const channelId = conversationResult.channel.id;
+
       const result = await this.client.chat.postMessage({
-        channel: slackUserId,
+        channel: channelId,
         text,
         mrkdwn: true,
       });
