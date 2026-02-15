@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import type { Task } from '../types';
 import { api } from '../lib/api';
 import { TaskList } from '../components/TaskList';
+import { useWebSocketContext } from '../context/WebSocketContext';
 
 export function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [repoFilter, setRepoFilter] = useState<string>('');
+  const { socket, isConnected } = useWebSocketContext();
 
   const loadTasks = async () => {
     try {
@@ -25,11 +27,53 @@ export function Dashboard() {
 
   useEffect(() => {
     loadTasks();
-
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(loadTasks, 30000);
-    return () => clearInterval(interval);
   }, [statusFilter, repoFilter]);
+
+  // WebSocket real-time updates
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    // Join dashboard room
+    socket.emit('dashboard:join');
+
+    // Handle dashboard state (on initial join or reconnect)
+    const handleDashboardState = (data: { tasks: Task[] }) => {
+      console.log('[Dashboard] Received dashboard state:', data);
+      setTasks(data.tasks);
+      setLoading(false);
+    };
+
+    // Handle task list updates
+    const handleTaskListUpdated = (payload: any) => {
+      console.log('[Dashboard] Task list updated:', payload);
+
+      setTasks((prevTasks) => {
+        const index = prevTasks.findIndex((t) => t._id === payload.taskId);
+
+        if (index !== -1) {
+          // Update existing task
+          const updatedTasks = [...prevTasks];
+          updatedTasks[index] = {
+            ...updatedTasks[index],
+            ...payload,
+          };
+          return updatedTasks;
+        } else {
+          // Add new task if not exists
+          return [payload, ...prevTasks];
+        }
+      });
+    };
+
+    socket.on('dashboard:state', handleDashboardState);
+    socket.on('dashboard:task_list_updated', handleTaskListUpdated);
+
+    return () => {
+      socket.off('dashboard:state', handleDashboardState);
+      socket.off('dashboard:task_list_updated', handleTaskListUpdated);
+      socket.emit('dashboard:leave');
+    };
+  }, [socket, isConnected]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

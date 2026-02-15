@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Inject,
   Optional,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Connection } from 'mongoose';
@@ -14,6 +15,7 @@ import { ClarifyTaskDto } from './dto/clarify-task.dto';
 import { TaskQueryDto } from './dto/task-query.dto';
 import type { ILlmService } from '../common/interfaces/llm.service.interface';
 import type { IGitHubService } from '../common/interfaces/github.service.interface';
+import type { TasksGateway } from './tasks.gateway';
 
 @Injectable()
 export class TasksService {
@@ -28,6 +30,9 @@ export class TasksService {
     @Optional()
     @Inject('SlackNotificationService')
     private readonly slackNotificationService?: any,
+    @Optional()
+    @Inject(forwardRef(() => 'TasksGateway'))
+    private readonly tasksGateway?: TasksGateway,
   ) {
     this.llmService = llmService;
     this.githubService = githubService;
@@ -63,11 +68,18 @@ export class TasksService {
     eventType: string,
     payload?: any,
   ): Promise<void> {
+    const event = { eventType, payload: payload || {}, createdAt: new Date() };
+
     await this.taskModel.findByIdAndUpdate(taskId, {
       $push: {
-        events: { eventType, payload: payload || {}, createdAt: new Date() },
+        events: event,
       },
     }).exec();
+
+    // Emit WebSocket event for real-time updates
+    if (this.tasksGateway) {
+      this.tasksGateway.emitTaskEventAdded(taskId, event);
+    }
   }
 
   async create(dto: CreateTaskDto) {
@@ -91,12 +103,30 @@ export class TasksService {
     // 2. Log "created" event
     await this.logEvent(taskId, 'created', { taskId });
 
+    // Emit task created event
+    if (this.tasksGateway) {
+      this.tasksGateway.emitTaskStatusChanged(taskId, {
+        status: TaskStatus.RECEIVED,
+        title: dto.description.substring(0, 100),
+        repo: task.repo,
+        createdBy: task.createdBy,
+        createdAt: task.createdAt,
+      });
+    }
+
     // 3. Update status to "analyzing"
     this.validateTransition(task.status, TaskStatus.ANALYZING);
     await this.taskModel.findByIdAndUpdate(taskId, {
       $set: { status: TaskStatus.ANALYZING },
     }).exec();
     await this.logEvent(taskId, 'analyzing');
+
+    // Emit analyzing status
+    if (this.tasksGateway) {
+      this.tasksGateway.emitTaskStatusChanged(taskId, {
+        status: TaskStatus.ANALYZING,
+      });
+    }
 
     try {
       // 4. Call LLM service to analyze
@@ -138,6 +168,14 @@ export class TasksService {
         await this.logEvent(taskId, 'clarification_sent', {
           questions: analysis.questions,
         });
+
+        // Emit clarification needed event
+        if (this.tasksGateway) {
+          this.tasksGateway.emitTaskStatusChanged(taskId, {
+            status: TaskStatus.NEEDS_CLARIFICATION,
+            questions: analysis.questions,
+          });
+        }
 
         return {
           ...updatedTask?.toJSON(),
@@ -265,6 +303,17 @@ export class TasksService {
       issueNumber: issue.issueNumber,
       issueUrl: issue.htmlUrl,
     });
+
+    // Emit dispatched event
+    if (this.tasksGateway) {
+      this.tasksGateway.emitTaskStatusChanged(taskId, {
+        status: TaskStatus.DISPATCHED,
+        issueNumber: issue.issueNumber,
+        issueUrl: issue.htmlUrl,
+        agent: analysis.recommended_agent,
+        taskType: analysis.task_type,
+      });
+    }
 
     // Send Slack notification if available
     if (this.slackNotificationService) {

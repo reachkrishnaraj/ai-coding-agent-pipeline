@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { CreateTaskDto } from '../types';
+import { TemplateSelector } from '../components/TemplateSelector';
+import { TemplateVariableForm } from '../components/TemplateVariableForm';
 
 interface CloneFromData {
   description: string;
@@ -17,11 +19,21 @@ interface LocationState {
   cloneFrom?: CloneFromData;
 }
 
+type Step = 'select-template' | 'fill-variables' | 'fill-form';
+
 export function NewTask() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const state = location.state as LocationState | null;
   const cloneFrom = state?.cloneFrom;
+  const templateIdFromQuery = searchParams.get('templateId');
+
+  const [step, setStep] = useState<Step>(
+    cloneFrom || templateIdFromQuery ? 'fill-form' : 'select-template',
+  );
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [templateVariables, setTemplateVariables] = useState<Record<string, any>>({});
 
   const [formData, setFormData] = useState<CreateTaskDto>({
     description: cloneFrom?.description || '',
@@ -33,7 +45,7 @@ export function NewTask() {
     recommended_agent: cloneFrom?.recommended_agent || '',
   });
   const [filesInput, setFilesInput] = useState(
-    cloneFrom?.files?.join(', ') || ''
+    cloneFrom?.files?.join(', ') || '',
   );
   const [questions, setQuestions] = useState<string[]>([]);
   const [answers, setAnswers] = useState<string[]>([]);
@@ -42,12 +54,69 @@ export function NewTask() {
   const [error, setError] = useState<string | null>(null);
   const isClone = !!cloneFrom;
 
+  // Load template from query param if present
+  useEffect(() => {
+    if (templateIdFromQuery && !selectedTemplate) {
+      loadTemplate(templateIdFromQuery);
+    }
+  }, [templateIdFromQuery]);
+
   // Clear location state after reading to prevent stale data on refresh
   useEffect(() => {
     if (cloneFrom) {
       window.history.replaceState({}, document.title);
     }
   }, [cloneFrom]);
+
+  const loadTemplate = async (templateId: string) => {
+    try {
+      const template = await api.templates.get(templateId);
+      setSelectedTemplate(template);
+      if (Object.keys(template.variables || {}).length > 0) {
+        setStep('fill-variables');
+      } else {
+        setStep('fill-form');
+      }
+    } catch (error) {
+      console.error('Failed to load template:', error);
+      setStep('select-template');
+    }
+  };
+
+  const handleTemplateSelect = (template: any) => {
+    setSelectedTemplate(template);
+    if (template.id === 'custom' || Object.keys(template.variables || {}).length === 0) {
+      setStep('fill-form');
+    } else {
+      setStep('fill-variables');
+    }
+  };
+
+  const handleVariablesSubmit = async (variables: Record<string, any>) => {
+    if (!selectedTemplate) return;
+
+    try {
+      setLoading(true);
+      const appliedData = await api.templates.apply(selectedTemplate.id, variables);
+
+      setTemplateVariables(variables);
+      setFormData({
+        description: appliedData.description,
+        type: appliedData.taskType || '',
+        repo: appliedData.repo || 'mothership/finance-service',
+        files: appliedData.filesHint || [],
+        acceptanceCriteria: appliedData.acceptanceCriteria?.join('\n') || '',
+        priority: appliedData.priority || 'normal',
+        recommended_agent: '',
+      });
+      setFilesInput(appliedData.filesHint?.join(', ') || '');
+      setStep('fill-form');
+    } catch (err: any) {
+      setError(err.message || 'Failed to apply template');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +163,7 @@ export function NewTask() {
     }
   };
 
+  // Clarification step
   if (questions.length > 0) {
     return (
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -144,12 +214,56 @@ export function NewTask() {
     );
   }
 
+  // Template selection step
+  if (step === 'select-template') {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white shadow sm:rounded-lg p-6">
+          <TemplateSelector
+            onSelect={handleTemplateSelect}
+            selectedTemplateId={selectedTemplate?.id}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Variable filling step
+  if (step === 'fill-variables' && selectedTemplate) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white shadow sm:rounded-lg p-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded">{error}</div>
+          )}
+          <TemplateVariableForm
+            template={selectedTemplate}
+            onSubmit={handleVariablesSubmit}
+            onBack={() => setStep('select-template')}
+            initialValues={templateVariables}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Form filling step
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-white shadow sm:rounded-lg p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">
-          {isClone ? 'Clone Task' : 'Create New Task'}
-        </h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isClone ? 'Clone Task' : selectedTemplate && selectedTemplate.id !== 'custom' ? `Create Task: ${selectedTemplate.name}` : 'Create New Task'}
+          </h1>
+          {!isClone && (
+            <button
+              onClick={() => setStep('select-template')}
+              className="text-sm text-blue-600 hover:text-blue-700"
+            >
+              Change Template
+            </button>
+          )}
+        </div>
         {isClone && (
           <p className="text-sm text-gray-500 mb-4">
             This form is pre-populated from an existing task. Edit as needed and

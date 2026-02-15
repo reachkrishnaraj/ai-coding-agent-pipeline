@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Task, TaskEvent } from '../types';
 import { api } from '../lib/api';
 import { StatusBadge } from '../components/StatusBadge';
 import { StatusTimeline } from '../components/StatusTimeline';
 import { TaskTimeline } from '../components/TaskTimeline';
+import { useWebSocketContext } from '../context/WebSocketContext';
 
 export function TaskDetail() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,8 @@ export function TaskDetail() {
   const [retrying, setRetrying] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [answers, setAnswers] = useState<string[]>([]);
+  const { socket, isConnected } = useWebSocketContext();
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   const loadTask = async () => {
     if (!id) return;
@@ -36,10 +39,83 @@ export function TaskDetail() {
 
   useEffect(() => {
     loadTask();
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(loadTask, 10000);
-    return () => clearInterval(interval);
   }, [id]);
+
+  // WebSocket real-time updates
+  useEffect(() => {
+    if (!socket || !isConnected || !id) return;
+
+    // Join task room
+    socket.emit('task:join', { taskId: id });
+
+    // Handle task state (on initial join or reconnect)
+    const handleTaskState = (taskData: Task) => {
+      console.log('[TaskDetail] Received task state:', taskData);
+      setTask(taskData);
+      setEvents(taskData.events || []);
+      setLoading(false);
+    };
+
+    // Handle status changes
+    const handleStatusChanged = (payload: any) => {
+      console.log('[TaskDetail] Status changed:', payload);
+      if (payload.taskId === id) {
+        setTask((prevTask) => {
+          if (!prevTask) return prevTask;
+          return {
+            ...prevTask,
+            status: payload.status,
+            ...payload,
+          };
+        });
+      }
+    };
+
+    // Handle event added
+    const handleEventAdded = (payload: { taskId: string; event: TaskEvent }) => {
+      console.log('[TaskDetail] Event added:', payload);
+      if (payload.taskId === id) {
+        setEvents((prevEvents) => [...prevEvents, payload.event]);
+
+        // Auto-scroll to latest event
+        setTimeout(() => {
+          if (timelineRef.current) {
+            timelineRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          }
+        }, 100);
+      }
+    };
+
+    // Handle PR updates
+    const handlePrUpdated = (payload: any) => {
+      console.log('[TaskDetail] PR updated:', payload);
+      if (payload.taskId === id) {
+        setTask((prevTask) => {
+          if (!prevTask) return prevTask;
+          return {
+            ...prevTask,
+            status: payload.status || prevTask.status,
+            githubPrNumber: payload.prNumber || prevTask.githubPrNumber,
+            githubPrUrl: payload.prUrl || prevTask.githubPrUrl,
+            githubPrStatus: payload.prStatus || prevTask.githubPrStatus,
+          };
+        });
+      }
+    };
+
+    socket.on('task:state', handleTaskState);
+    socket.on('task:status_changed', handleStatusChanged);
+    socket.on('task:event_added', handleEventAdded);
+    socket.on('task:pr_updated', handlePrUpdated);
+
+    return () => {
+      socket.off('task:state', handleTaskState);
+      socket.off('task:status_changed', handleStatusChanged);
+      socket.off('task:event_added', handleEventAdded);
+      socket.off('task:pr_updated', handlePrUpdated);
+      socket.emit('task:leave', { taskId: id });
+    };
+  }, [socket, isConnected, id]);
 
   const handleRetry = async () => {
     if (!id) return;
@@ -314,7 +390,7 @@ export function TaskDetail() {
       </div>
 
       {/* Event Log */}
-      <div className="mt-8 bg-white shadow overflow-hidden sm:rounded-lg">
+      <div ref={timelineRef} className="mt-8 bg-white shadow overflow-hidden sm:rounded-lg">
         <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
           <h2 className="text-lg font-medium text-gray-900">Event Log</h2>
           <span className="text-sm text-gray-500">{events.length} events</span>

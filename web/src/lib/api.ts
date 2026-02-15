@@ -130,4 +130,79 @@ export const api = {
         method: 'POST',
       }),
   },
+
+  templates: {
+    list: (params?: {
+      type?: string;
+      repo?: string;
+      search?: string;
+      sort?: string;
+      page?: number;
+      limit?: number;
+    }) => {
+      const query = new URLSearchParams();
+      if (params?.type) query.append('type', params.type);
+      if (params?.repo) query.append('repo', params.repo);
+      if (params?.search) query.append('search', params.search);
+      if (params?.sort) query.append('sort', params.sort);
+      if (params?.page) query.append('page', String(params.page));
+      if (params?.limit) query.append('limit', String(params.limit));
+
+      return fetchAPI<{
+        templates: any[];
+        total: number;
+        page: number;
+        limit: number;
+      }>(`/templates?${query}`);
+    },
+
+    get: (id: string) => fetchAPI<any>(`/templates/${id}`),
+
+    create: (data: any) =>
+      fetchAPI<any>('/templates', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+
+    update: (id: string, data: any) =>
+      fetchAPI<any>(`/templates/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+
+    delete: (id: string) =>
+      fetchAPI<void>(`/templates/${id}`, {
+        method: 'DELETE',
+      }),
+
+    apply: (id: string, variables: Record<string, any>) =>
+      fetchAPI<{
+        templateId: string;
+        description: string;
+        repo?: string;
+        taskType?: string;
+        priority?: string;
+        filesHint?: string[];
+        acceptanceCriteria?: string[];
+      }>(`/templates/${id}/apply`, {
+        method: 'POST',
+        body: JSON.stringify({ variables }),
+      }),
+
+    favorite: (id: string) =>
+      fetchAPI<{ favorited: boolean; favoriteCount: number }>(
+        `/templates/${id}/favorite`,
+        {
+          method: 'POST',
+        },
+      ),
+
+    unfavorite: (id: string) =>
+      fetchAPI<{ favorited: boolean; favoriteCount: number }>(
+        `/templates/${id}/favorite`,
+        {
+          method: 'DELETE',
+        },
+      ),
+  },
 };

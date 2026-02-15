@@ -90,6 +90,10 @@ export class Task {
   @Prop()
   slackThreadTs?: string;
 
+  // Template tracking
+  @Prop()
+  templateId?: string;
+
   // Meta
   @Prop()
   createdBy?: string;
@@ -102,6 +106,22 @@ export class Task {
 
   @Prop()
   errorMessage?: string;
+
+  // Retry and escalation fields
+  @Prop({ default: 0 })
+  retryCount?: number;
+
+  @Prop()
+  failureReason?: string; // LLM_API_ERROR, GITHUB_API_ERROR, TRANSIENT_ERROR, etc.
+
+  @Prop({ default: false })
+  needsEscalation?: boolean;
+
+  @Prop()
+  githubPrUpdatedAt?: Date;
+
+  @Prop({ default: false })
+  analyticsExclude?: boolean;
 
   // Embedded events (denormalized for fast reads)
   @Prop({

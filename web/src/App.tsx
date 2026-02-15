@@ -14,6 +14,9 @@ import { Dashboard } from './pages/Dashboard';
 import { NewTask } from './pages/NewTask';
 import { TaskDetail } from './pages/TaskDetail';
 import { AdminUsers } from './pages/AdminUsers';
+import { Templates } from './pages/Templates';
+import { WebSocketProvider } from './context/WebSocketContext';
+import { ConnectionStatus } from './components/ConnectionStatus';
 
 // User context for global user state
 interface UserContextType {
@@ -64,6 +67,9 @@ function ProtectedRoute({
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar user={user} />
+      <div className="fixed top-4 right-4 z-50 bg-white px-3 py-2 rounded-md shadow-sm border border-gray-200">
+        <ConnectionStatus />
+      </div>
       {children}
     </div>
   );
@@ -122,6 +128,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/templates"
+          element={
+            <ProtectedRoute>
+              <Templates />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/users"
           element={
             <ProtectedRoute requireAdmin>
@@ -137,7 +151,9 @@ function AppRoutes() {
 function App() {
   return (
     <Router>
-      <AppRoutes />
+      <WebSocketProvider>
+        <AppRoutes />
+      </WebSocketProvider>
     </Router>
   );
 }

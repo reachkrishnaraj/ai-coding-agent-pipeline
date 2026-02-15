@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { GitHubIssuesService } from './github-issues.service';
@@ -10,6 +10,7 @@ import { Task, TaskSchema } from '../common/schemas/task.schema';
   imports: [
     ConfigModule,
     MongooseModule.forFeature([{ name: Task.name, schema: TaskSchema }]),
+    forwardRef(() => require('../tasks/tasks.module').TasksModule),
   ],
   controllers: [GitHubWebhookController],
   providers: [

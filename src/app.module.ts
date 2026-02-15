@@ -9,6 +9,8 @@ import { TasksModule } from './tasks/tasks.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { SlackModule } from './slack/slack.module';
+import { TemplatesModule } from './templates/templates.module';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { SlackModule } from './slack/slack.module';
     AuthModule,
     UsersModule,
     SlackModule,
+    TemplatesModule,
+    JobsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

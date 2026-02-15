@@ -6,6 +6,8 @@ import {
   Logger,
   BadRequestException,
   UnauthorizedException,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
@@ -13,6 +15,7 @@ import { Model } from 'mongoose';
 import { Task, TaskDocument } from '../common/schemas/task.schema';
 import { TaskStatus } from '../common/enums/task-status.enum';
 import { SlackNotificationService } from '../slack/slack-notification.service';
+import type { TasksGateway } from '../tasks/tasks.gateway';
 import * as crypto from 'crypto';
 
 interface WebhookPayload {
@@ -51,6 +54,9 @@ export class GitHubWebhookController {
     private readonly configService: ConfigService,
     @InjectModel(Task.name) private taskModel: Model<TaskDocument>,
     private readonly slackNotificationService: SlackNotificationService,
+    @Optional()
+    @Inject('TasksGateway')
+    private readonly tasksGateway?: TasksGateway,
   ) {
     this.webhookSecret =
       this.configService.get<string>('GITHUB_WEBHOOK_SECRET') || '';
@@ -169,6 +175,16 @@ export class GitHubWebhookController {
 
     this.logger.log(`Task ${taskId} updated to pr_open`);
 
+    // Emit WebSocket event
+    if (this.tasksGateway) {
+      this.tasksGateway.emitTaskPrUpdated(taskId, {
+        status: TaskStatus.PR_OPEN,
+        prNumber: pullRequest.number,
+        prUrl: pullRequest.html_url,
+        prStatus: 'open',
+      });
+    }
+
     // Send Slack notification
     await this.slackNotificationService.notifyPROpened(taskId);
   }
@@ -196,6 +212,16 @@ export class GitHubWebhookController {
 
     this.logger.log(`Task ${taskId} completed and merged`);
 
+    // Emit WebSocket event
+    if (this.tasksGateway) {
+      this.tasksGateway.emitTaskPrUpdated(taskId, {
+        status: TaskStatus.MERGED,
+        prNumber: pullRequest.number,
+        prUrl: pullRequest.html_url,
+        prStatus: 'merged',
+      });
+    }
+
     // Send Slack notification
     await this.slackNotificationService.notifyPRMerged(taskId);
   }
@@ -221,6 +247,16 @@ export class GitHubWebhookController {
     }).exec();
 
     this.logger.log(`Task ${taskId} failed - PR closed without merge`);
+
+    // Emit WebSocket event
+    if (this.tasksGateway) {
+      this.tasksGateway.emitTaskStatusChanged(taskId, {
+        status: TaskStatus.FAILED,
+        prNumber: pullRequest.number,
+        prUrl: pullRequest.html_url,
+        prStatus: 'closed',
+      });
+    }
 
     // Send Slack notification
     await this.slackNotificationService.notifyPRClosed(taskId);
