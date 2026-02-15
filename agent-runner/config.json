@@ -1,0 +1,69 @@
+{
+  "models": {
+    "claude-code": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "description": "Best for complex refactoring and architecture tasks",
+      "max_tokens": 8192
+    },
+    "claude-opus": {
+      "provider": "anthropic",
+      "model": "claude-opus-4-20250514",
+      "description": "Most capable, use for very complex tasks",
+      "max_tokens": 8192
+    },
+    "gpt-4o": {
+      "provider": "openai",
+      "model": "gpt-4o",
+      "description": "Fast and capable for most coding tasks",
+      "max_tokens": 4096
+    },
+    "gpt-4-turbo": {
+      "provider": "openai",
+      "model": "gpt-4-turbo",
+      "description": "Good balance of speed and capability",
+      "max_tokens": 4096
+    },
+    "codex": {
+      "provider": "openai",
+      "model": "gpt-4o",
+      "description": "Quick code generation",
+      "max_tokens": 4096
+    },
+    "gemini-pro": {
+      "provider": "google",
+      "model": "gemini/gemini-1.5-pro",
+      "description": "Google's most capable model",
+      "max_tokens": 8192
+    },
+    "gemini-flash": {
+      "provider": "google",
+      "model": "gemini/gemini-1.5-flash",
+      "description": "Fast and efficient",
+      "max_tokens": 8192
+    },
+    "deepseek": {
+      "provider": "deepseek",
+      "model": "deepseek/deepseek-coder",
+      "description": "Specialized for code",
+      "max_tokens": 4096
+    },
+    "mistral-large": {
+      "provider": "mistral",
+      "model": "mistral/mistral-large-latest",
+      "description": "Mistral's flagship model",
+      "max_tokens": 4096
+    }
+  },
+  "default_model": "claude-code",
+  "agent_mapping": {
+    "claude-code": "claude-code",
+    "codex": "codex",
+    "copilot": "gpt-4o",
+    "default": "claude-code"
+  },
+  "file_extensions": {
+    "include": [".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs", ".rb", ".php", ".cs", ".cpp", ".c", ".h", ".hpp", ".swift", ".kt", ".scala", ".md", ".json", ".yaml", ".yml", ".toml", ".xml", ".html", ".css", ".scss", ".sql", ".sh", ".bash", ".zsh"],
+    "exclude_dirs": ["node_modules", ".git", "dist", "build", "__pycache__", ".venv", "venv", "target", "vendor"]
+  }
+}

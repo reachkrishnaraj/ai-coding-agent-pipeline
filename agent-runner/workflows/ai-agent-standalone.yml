@@ -1,0 +1,283 @@
+# AI Coding Agent Workflow (Standalone Version)
+# Copy this file to your repo: .github/workflows/ai-agent.yml
+#
+# This version embeds the agent script directly - no external dependencies.
+#
+# Required Secrets (add only what you need):
+#   - ANTHROPIC_API_KEY (for Claude models)
+#   - OPENAI_API_KEY (for GPT-4/Codex)
+#   - GOOGLE_API_KEY (for Gemini models)
+
+name: AI Coding Agent
+
+on:
+  issues:
+    types: [labeled]
+
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to process'
+        required: true
+        type: number
+      model:
+        description: 'Model to use'
+        required: false
+        default: 'claude-sonnet-4-20250514'
+        type: choice
+        options:
+          - 'claude-sonnet-4-20250514'
+          - 'claude-opus-4-20250514'
+          - 'gpt-4o'
+          - 'gpt-4-turbo'
+          - 'gemini/gemini-1.5-pro'
+
+jobs:
+  ai-agent:
+    if: |
+      (github.event_name == 'issues' && github.event.label.name == 'ai-task') ||
+      github.event_name == 'workflow_dispatch'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install litellm PyGithub gitpython rich
+
+      - name: Determine issue number
+        id: issue
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "number=${{ inputs.issue_number }}" >> $GITHUB_OUTPUT
+            echo "model=${{ inputs.model }}" >> $GITHUB_OUTPUT
+          else
+            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+            echo "model=claude-sonnet-4-20250514" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run AI Agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          python << 'AGENT_SCRIPT'
+          import os
+          import sys
+          import re
+          import json
+          from pathlib import Path
+          from dataclasses import dataclass
+          import litellm
+          from github import Github
+          from git import Repo
+
+          @dataclass
+          class TaskContext:
+              issue_number: int
+              title: str
+              description: str
+              task_type: str
+              acceptance_criteria: list
+              likely_files: list
+              repo_name: str
+              branch_name: str
+              model: str
+
+          def parse_issue(issue, model):
+              body = issue.body or ""
+              sections = {}
+              current_section = "description"
+              current_content = []
+
+              for line in body.split("\n"):
+                  if line.startswith("## "):
+                      if current_content:
+                          sections[current_section] = "\n".join(current_content).strip()
+                      current_section = line[3:].strip().lower().replace(" ", "_")
+                      current_content = []
+                  else:
+                      current_content.append(line)
+              if current_content:
+                  sections[current_section] = "\n".join(current_content).strip()
+
+              criteria = []
+              for line in sections.get("acceptance_criteria", "").split("\n"):
+                  match = re.match(r"- \[[ x]\] (.+)", line)
+                  if match:
+                      criteria.append(match.group(1))
+
+              files = []
+              for line in sections.get("likely_files", "").split("\n"):
+                  match = re.match(r"- `(.+)`", line)
+                  if match:
+                      files.append(match.group(1))
+
+              task_type = "feature"
+              type_match = re.search(r"Task type: \*\*(.+?)\*\*", sections.get("agent_instructions", ""))
+              if type_match:
+                  task_type = type_match.group(1)
+
+              branch = f"ai-task/{issue.number}-{re.sub(r'[^a-z0-9]+', '-', issue.title.lower())[:40]}"
+
+              return TaskContext(
+                  issue_number=issue.number,
+                  title=issue.title,
+                  description=sections.get("description", body),
+                  task_type=task_type,
+                  acceptance_criteria=criteria,
+                  likely_files=files,
+                  repo_name=issue.repository.full_name,
+                  branch_name=branch,
+                  model=model,
+              )
+
+          def read_files(repo_path, likely_files):
+              files = {}
+              extensions = {'.py', '.js', '.ts', '.tsx', '.java', '.go', '.rs', '.rb', '.md', '.json', '.yaml', '.yml', '.properties', '.xml'}
+              exclude = {'node_modules', '.git', 'dist', 'build', '__pycache__', 'target'}
+
+              for fp in likely_files:
+                  if fp == "select as you analyze":
+                      continue
+                  path = repo_path / fp
+                  if path.is_file():
+                      try:
+                          files[fp] = path.read_text(errors="ignore")
+                      except:
+                          pass
+
+              if not files:
+                  for key in ["README.md", "package.json", "pom.xml", "build.gradle", "application.properties"]:
+                      path = repo_path / key
+                      if path.is_file():
+                          try:
+                              files[key] = path.read_text(errors="ignore")
+                          except:
+                              pass
+              return files
+
+          def build_prompt(ctx, files):
+              fc = "\n".join(f"### {p}\n```\n{c}\n```" for p, c in files.items())
+              return f"""You are an expert software engineer. Complete this coding task.
+
+          ## Task
+          {ctx.title}
+
+          ## Description
+          {ctx.description}
+
+          ## Acceptance Criteria
+          {chr(10).join(f'- {c}' for c in ctx.acceptance_criteria) if ctx.acceptance_criteria else 'See description'}
+
+          ## Existing Files
+          {fc if fc else 'No files provided'}
+
+          ## Instructions
+          Provide your solution as file changes using this EXACT format for EACH file:
+
+          ### FILE: path/to/file.ext
+          ```
+          complete file content
+          ```
+
+          Include COMPLETE file content. Do NOT include explanations outside code comments.
+          """
+
+          def parse_response(resp):
+              files = {}
+              for m in re.findall(r"### FILE: (.+?)\n```\w*\n(.*?)```", resp, re.DOTALL):
+                  p, c = m[0].strip(), m[1].strip()
+                  if p and c:
+                      files[p] = c
+              return files
+
+          def main():
+              gh_token = os.environ["GITHUB_TOKEN"]
+              repo_name = os.environ["GITHUB_REPOSITORY"]
+              issue_num = int("${{ steps.issue.outputs.number }}")
+              model = "${{ steps.issue.outputs.model }}"
+
+              gh = Github(gh_token)
+              repo = gh.get_repo(repo_name)
+              issue = repo.get_issue(issue_num)
+
+              print(f"Processing: {issue.title}")
+              ctx = parse_issue(issue, model)
+
+              repo_path = Path(".")
+              files = read_files(repo_path, ctx.likely_files)
+              print(f"Read {len(files)} files")
+
+              prompt = build_prompt(ctx, files)
+              print(f"Calling {model}...")
+
+              resp = litellm.completion(
+                  model=model,
+                  messages=[
+                      {"role": "system", "content": "You are an expert software engineer."},
+                      {"role": "user", "content": prompt}
+                  ],
+                  max_tokens=8192,
+                  temperature=0.2,
+              )
+
+              changes = parse_response(resp.choices[0].message.content)
+              if not changes:
+                  print("No changes detected")
+                  print(resp.choices[0].message.content[:2000])
+                  sys.exit(1)
+
+              modified = []
+              for fp, content in changes.items():
+                  path = repo_path / fp
+                  path.parent.mkdir(parents=True, exist_ok=True)
+                  path.write_text(content)
+                  modified.append(fp)
+                  print(f"Modified: {fp}")
+
+              git_repo = Repo(".")
+              git_repo.create_head(ctx.branch_name).checkout()
+              git_repo.index.add(modified)
+              git_repo.index.commit(f"{ctx.task_type}: {ctx.title}\n\nCloses #{ctx.issue_number}")
+              git_repo.remotes.origin.push(ctx.branch_name, set_upstream=True)
+
+              pr = repo.create_pull(
+                  title=f"{ctx.task_type}: {ctx.title}",
+                  body=f"Closes #{ctx.issue_number}\n\nChanges:\n" + "\n".join(f"- `{f}`" for f in modified),
+                  head=ctx.branch_name,
+                  base=repo.default_branch,
+              )
+              print(f"PR created: {pr.html_url}")
+              issue.create_comment(f"AI Agent created PR: {pr.html_url}")
+
+          main()
+          AGENT_SCRIPT
+
+      - name: Comment on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.issue.outputs.number }},
+              body: '❌ AI Agent failed. Check [logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})'
+            });
