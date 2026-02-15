@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, createContext, useContext } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -9,29 +9,37 @@ import { api } from './lib/api';
 import type { User } from './types';
 import { Navbar } from './components/Navbar';
 import { Login } from './pages/Login';
+import { Pending } from './pages/Pending';
 import { Dashboard } from './pages/Dashboard';
 import { NewTask } from './pages/NewTask';
 import { TaskDetail } from './pages/TaskDetail';
+import { AdminUsers } from './pages/AdminUsers';
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
-  const [user, setUser] = useState<User | undefined>();
+// User context for global user state
+interface UserContextType {
+  user: User | null;
+  loading: boolean;
+  refetch: () => Promise<void>;
+}
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await api.auth.getMe();
-        setAuthenticated(response.authenticated);
-        setUser(response.user);
-      } catch {
-        setAuthenticated(false);
-      }
-    };
+const UserContext = createContext<UserContextType>({
+  user: null,
+  loading: true,
+  refetch: async () => {},
+});
 
-    checkAuth();
-  }, []);
+export const useUser = () => useContext(UserContext);
 
-  if (authenticated === null) {
+function ProtectedRoute({
+  children,
+  requireAdmin = false,
+}: {
+  children: React.ReactNode;
+  requireAdmin?: boolean;
+}) {
+  const { user, loading } = useUser();
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray-500">Loading...</p>
@@ -39,8 +47,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!authenticated) {
+  if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Redirect pending users
+  if (user.status === 'pending') {
+    return <Navigate to="/pending" replace />;
+  }
+
+  // Check admin requirement
+  if (requireAdmin && user.role !== 'admin') {
+    return <Navigate to="/" replace />;
   }
 
   return (
@@ -51,11 +69,34 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   );
 }
 
-function App() {
+function AppRoutes() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchUser = async () => {
+    try {
+      const response = await api.auth.getMe();
+      if (response.authenticated && response.user) {
+        setUser(response.user);
+      } else {
+        setUser(null);
+      }
+    } catch {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUser();
+  }, []);
+
   return (
-    <Router>
+    <UserContext.Provider value={{ user, loading, refetch: fetchUser }}>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/pending" element={<Pending />} />
         <Route
           path="/"
           element={
@@ -80,7 +121,23 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminUsers />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
+    </UserContext.Provider>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppRoutes />
     </Router>
   );
 }

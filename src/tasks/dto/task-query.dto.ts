@@ -31,4 +31,8 @@ export class TaskQueryDto {
   @IsOptional()
   @IsString()
   repo?: string;
+
+  @IsOptional()
+  @IsString()
+  createdBy?: string;
 }

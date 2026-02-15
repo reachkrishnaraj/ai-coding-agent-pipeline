@@ -5,6 +5,8 @@ import type {
   CreateTaskResponse,
   ClarifyTaskDto,
   TaskEvent,
+  User,
+  UpdateUserDto,
 } from '../types';
 
 const API_BASE = '/api';
@@ -22,6 +24,10 @@ async function fetchAPI<T>(url: string, options?: RequestInit): Promise<T> {
   if (response.status === 401) {
     window.location.href = '/login';
     throw new Error('Unauthorized');
+  }
+
+  if (response.status === 403) {
+    throw new Error('Forbidden');
   }
 
   if (!response.ok) {
@@ -82,6 +88,46 @@ export const api = {
     cancel: (id: string) =>
       fetchAPI<void>(`/tasks/${id}`, {
         method: 'DELETE',
+      }),
+  },
+
+  users: {
+    list: (params?: { status?: string; role?: string }) => {
+      const query = new URLSearchParams();
+      if (params?.status) query.append('status', params.status);
+      if (params?.role) query.append('role', params.role);
+
+      return fetchAPI<{ users: User[] }>(`/users?${query}`);
+    },
+
+    listPending: () => fetchAPI<{ users: User[] }>('/users/pending'),
+
+    get: (id: string) => fetchAPI<User>(`/users/${id}`),
+
+    update: (id: string, data: UpdateUserDto) =>
+      fetchAPI<User>(`/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    approve: (id: string) =>
+      fetchAPI<User>(`/users/${id}/approve`, {
+        method: 'POST',
+      }),
+
+    deactivate: (id: string) =>
+      fetchAPI<User>(`/users/${id}/deactivate`, {
+        method: 'POST',
+      }),
+
+    makeAdmin: (id: string) =>
+      fetchAPI<User>(`/users/${id}/make-admin`, {
+        method: 'POST',
+      }),
+
+    makeDeveloper: (id: string) =>
+      fetchAPI<User>(`/users/${id}/make-developer`, {
+        method: 'POST',
       }),
   },
 };

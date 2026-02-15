@@ -49,12 +49,18 @@ export interface TaskEvent {
   createdAt: string;
 }
 
+export type UserRole = 'admin' | 'developer';
+export type UserStatus = 'pending' | 'active' | 'inactive';
+
 export interface User {
   id: string;
+  githubId: string;
   username: string;
   displayName: string;
   email: string;
   avatarUrl: string;
+  role: UserRole;
+  status: UserStatus;
 }
 
 export interface AuthResponse {
@@ -86,4 +92,9 @@ export interface CreateTaskResponse {
 
 export interface ClarifyTaskDto {
   answers: string[];
+}
+
+export interface UpdateUserDto {
+  role?: UserRole;
+  status?: UserStatus;
 }

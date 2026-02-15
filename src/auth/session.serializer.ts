@@ -1,20 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { PassportSerializer } from '@nestjs/passport';
-import { GitHubUser } from './github.strategy';
+import { AuthService, SessionUser } from './auth.service';
 
 @Injectable()
 export class SessionSerializer extends PassportSerializer {
-  serializeUser(
-    user: GitHubUser,
-    done: (err: Error | null, user: any) => void,
-  ): void {
-    done(null, user);
+  constructor(private readonly authService: AuthService) {
+    super();
   }
 
-  deserializeUser(
-    payload: any,
-    done: (err: Error | null, user: any) => void,
-  ): void {
-    done(null, payload);
+  serializeUser(user: SessionUser, done: (err: any, id?: string) => void) {
+    // Store user ID in session
+    done(null, user.id);
+  }
+
+  async deserializeUser(id: string, done: (err: any, user?: SessionUser | null) => void) {
+    try {
+      const user = await this.authService.getUserById(id);
+      done(null, user);
+    } catch (err) {
+      done(err, null);
+    }
   }
 }

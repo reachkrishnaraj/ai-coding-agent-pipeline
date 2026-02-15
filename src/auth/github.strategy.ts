@@ -3,21 +3,16 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-github2';
 import { ConfigService } from '@nestjs/config';
 import { Octokit } from '@octokit/rest';
-
-export interface GitHubUser {
-  id: string;
-  username: string;
-  displayName: string;
-  email: string;
-  avatarUrl: string;
-  accessToken: string;
-}
+import { AuthService, SessionUser } from './auth.service';
 
 @Injectable()
 export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
   private readonly logger = new Logger(GitHubStrategy.name);
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly authService: AuthService,
+  ) {
     const clientID = configService.get<string>('GITHUB_OAUTH_CLIENT_ID');
     const clientSecret = configService.get<string>('GITHUB_OAUTH_CLIENT_SECRET');
 
@@ -42,7 +37,7 @@ export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
     accessToken: string,
     _refreshToken: string,
     profile: any,
-  ): Promise<GitHubUser> {
+  ): Promise<SessionUser> {
     // Check if org restriction is configured
     const requiredOrg = this.configService.get<string>('GITHUB_REQUIRED_ORG');
 
@@ -71,8 +66,8 @@ export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
       }
     }
 
-    // No org restriction or passed check - allow login
-    return {
+    // Validate and persist user
+    const githubProfile = {
       id: profile.id,
       username: profile.username,
       displayName: profile.displayName,
@@ -80,5 +75,7 @@ export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
       avatarUrl: profile.photos?.[0]?.value || '',
       accessToken,
     };
+
+    return this.authService.validateUser(githubProfile);
   }
 }

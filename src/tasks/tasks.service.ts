@@ -281,7 +281,7 @@ export class TasksService {
   }
 
   async findAll(query: TaskQueryDto) {
-    const { page = 1, limit = 20, status, repo } = query;
+    const { page = 1, limit = 20, status, repo, createdBy } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -290,6 +290,9 @@ export class TasksService {
     }
     if (repo) {
       where.repo = repo;
+    }
+    if (createdBy) {
+      where.createdBy = createdBy;
     }
 
     const [tasks, total] = await Promise.all([

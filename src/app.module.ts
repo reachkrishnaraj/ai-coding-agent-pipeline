@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
 import { TasksModule } from './tasks/tasks.module';
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 import { SlackModule } from './slack/slack.module';
 
 @Module({
@@ -23,6 +24,7 @@ import { SlackModule } from './slack/slack.module';
     DatabaseModule,
     TasksModule,
     AuthModule,
+    UsersModule,
     SlackModule,
   ],
   controllers: [AppController],
