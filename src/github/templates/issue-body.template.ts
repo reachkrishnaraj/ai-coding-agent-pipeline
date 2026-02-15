@@ -7,10 +7,11 @@ export interface IssueTemplateData {
   description: string;
   analysis: LlmAnalysis;
   clarificationQA?: ClarificationQA[];
+  pipelineUrl?: string;
 }
 
 export function generateIssueBody(data: IssueTemplateData): string {
-  const { taskId, source, description, analysis, clarificationQA } = data;
+  const { taskId, source, description, analysis, clarificationQA, pipelineUrl } = data;
 
   const sections: string[] = [];
 
@@ -81,6 +82,12 @@ export function generateIssueBody(data: IssueTemplateData): string {
 
   // Footer
   sections.push(`---`);
+  if (pipelineUrl) {
+    sections.push(
+      `**Pipeline Task:** [View in AI Pipeline](${pipelineUrl}/tasks/${taskId})`,
+    );
+    sections.push('');
+  }
   sections.push(
     `*Created by AI Pipeline | Task ID: ${taskId} | Source: ${source}*`,
   );

@@ -99,6 +99,7 @@ jobs:
               repo_name: str
               branch_name: str
               model: str
+              pipeline_task_url: str = None
 
           def parse_issue(issue, model):
               body = issue.body or ""
@@ -134,6 +135,12 @@ jobs:
               if type_match:
                   task_type = type_match.group(1)
 
+              # Extract pipeline task URL for 2-way navigation
+              pipeline_task_url = None
+              pipeline_match = re.search(r'\[View in AI Pipeline\]\((.+?)\)', body)
+              if pipeline_match:
+                  pipeline_task_url = pipeline_match.group(1)
+
               branch = f"ai-task/{issue.number}-{re.sub(r'[^a-z0-9]+', '-', issue.title.lower())[:40]}"
 
               return TaskContext(
@@ -146,6 +153,7 @@ jobs:
                   repo_name=issue.repository.full_name,
                   branch_name=branch,
                   model=model,
+                  pipeline_task_url=pipeline_task_url,
               )
 
           def read_files(repo_path, likely_files):
@@ -258,9 +266,16 @@ jobs:
               git_repo.index.commit(f"{ctx.task_type}: {ctx.title}\n\nCloses #{ctx.issue_number}")
               git_repo.remotes.origin.push(ctx.branch_name, set_upstream=True)
 
+              # Build PR body with pipeline task URL for 2-way navigation
+              pr_body_parts = [f"Closes #{ctx.issue_number}"]
+              if ctx.pipeline_task_url:
+                  pr_body_parts.append(f"\n**Pipeline Task:** {ctx.pipeline_task_url}")
+              pr_body_parts.append("\n## Changes")
+              pr_body_parts.extend([f"- `{f}`" for f in modified])
+
               pr = repo.create_pull(
                   title=f"{ctx.task_type}: {ctx.title}",
-                  body=f"Closes #{ctx.issue_number}\n\nChanges:\n" + "\n".join(f"- `{f}`" for f in modified),
+                  body="\n".join(pr_body_parts),
                   head=ctx.branch_name,
                   base=repo.default_branch,
               )

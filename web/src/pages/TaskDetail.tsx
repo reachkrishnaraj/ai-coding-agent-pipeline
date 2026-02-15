@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import type { Task, TaskEvent } from '../types';
 import { api } from '../lib/api';
 import { StatusBadge } from '../components/StatusBadge';
+import { StatusTimeline } from '../components/StatusTimeline';
 import { TaskTimeline } from '../components/TaskTimeline';
 
 export function TaskDetail() {
@@ -297,9 +298,26 @@ export function TaskDetail() {
         </div>
       </div>
 
+      {/* Status Progress Timeline */}
       <div className="mt-8 bg-white shadow overflow-hidden sm:rounded-lg">
         <div className="px-4 py-5 sm:px-6">
-          <h2 className="text-lg font-medium text-gray-900">Timeline</h2>
+          <h2 className="text-lg font-medium text-gray-900">Progress</h2>
+        </div>
+        <div className="border-t border-gray-200 px-6 py-8">
+          <StatusTimeline
+            currentStatus={task.status}
+            createdAt={task.createdAt}
+            dispatchedAt={task.dispatchedAt}
+            completedAt={task.completedAt}
+          />
+        </div>
+      </div>
+
+      {/* Event Log */}
+      <div className="mt-8 bg-white shadow overflow-hidden sm:rounded-lg">
+        <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
+          <h2 className="text-lg font-medium text-gray-900">Event Log</h2>
+          <span className="text-sm text-gray-500">{events.length} events</span>
         </div>
         <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
           <TaskTimeline events={events} />

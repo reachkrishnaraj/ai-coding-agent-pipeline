@@ -74,13 +74,15 @@ export class GitHubIssuesService {
     // Build labels
     const labels = this.buildLabels(analysis);
 
-    // Generate issue body
+    // Generate issue body with pipeline URL for 2-way navigation
+    const pipelineUrl = this.configService.get<string>('APP_URL');
     const body = generateIssueBody({
       taskId,
       source,
       description,
       analysis,
       clarificationQA,
+      pipelineUrl,
     });
 
     try {
