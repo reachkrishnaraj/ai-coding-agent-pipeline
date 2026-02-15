@@ -22,14 +22,12 @@ export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
     const clientSecret = configService.get<string>('GITHUB_OAUTH_CLIENT_SECRET');
 
     // Use placeholder values if not configured - strategy won't be usable but app will start
-    // Callback URL should go through frontend proxy in dev so session cookie works
-    const frontendUrl = configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
     super({
       clientID: clientID || 'not-configured',
       clientSecret: clientSecret || 'not-configured',
       callbackURL:
         configService.get<string>('GITHUB_OAUTH_CALLBACK_URL') ||
-        `${frontendUrl}/api/auth/github/callback`,
+        'http://localhost:3000/api/auth/github/callback',
       scope: ['read:user', 'read:org'],
     });
 
