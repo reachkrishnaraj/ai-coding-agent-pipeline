@@ -98,23 +98,38 @@ export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
 
     for (const allowed of allowedRepos) {
       try {
-        // Check if it's an org (ends with /) or specific repo
+        // Check if it's an owner/org prefix (ends with /) or specific repo
         if (allowed.endsWith('/')) {
-          // It's an org - check membership
-          const orgName = allowed.slice(0, -1);
+          const ownerName = allowed.slice(0, -1);
+
+          // Check 1: Is the user the owner themselves?
+          if (ownerName.toLowerCase() === username.toLowerCase()) {
+            this.logger.log(`User ${username} is the owner of namespace ${ownerName}/`);
+            return true;
+          }
+
+          // Check 2: Is it an org the user is a member of?
           try {
             await octokit.rest.orgs.checkMembershipForUser({
-              org: orgName,
+              org: ownerName,
               username,
             });
-            this.logger.log(`User ${username} is member of org ${orgName}`);
+            this.logger.log(`User ${username} is member of org ${ownerName}`);
             return true;
           } catch {
-            // Not a member, continue checking
+            // Not a member or not an org, continue checking
           }
         } else if (allowed.includes('/')) {
           // It's a specific repo - check access
           const [owner, repo] = allowed.split('/');
+
+          // Check if user is the owner
+          if (owner.toLowerCase() === username.toLowerCase()) {
+            this.logger.log(`User ${username} owns repo ${allowed}`);
+            return true;
+          }
+
+          // Check collaborator access
           try {
             await octokit.rest.repos.getCollaboratorPermissionLevel({
               owner,
