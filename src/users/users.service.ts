@@ -15,6 +15,7 @@ export interface CreateUserInput {
   displayName: string;
   email: string;
   avatarUrl: string;
+  hasRepoAccess?: boolean;
 }
 
 export interface UpdateUserInput {
@@ -54,8 +55,15 @@ export class UsersService {
       user.displayName = input.displayName;
       user.email = input.email;
       user.avatarUrl = input.avatarUrl;
+
+      // Auto-activate if they now have repo access but were pending
+      if (user.status === 'pending' && input.hasRepoAccess) {
+        user.status = 'active';
+        this.logger.log(`User ${user.username} auto-activated (has repo access)`);
+      }
+
       await user.save();
-      this.logger.log(`User logged in: ${user.username} (${user.role})`);
+      this.logger.log(`User logged in: ${user.username} (${user.role}, ${user.status})`);
       return user;
     }
 
@@ -66,11 +74,21 @@ export class UsersService {
     );
     const isFirstUser = userCount === 0;
 
+    // Determine role - admin for first user or configured admin usernames
     const role: UserRole = isFirstUser || isAdminUsername ? 'admin' : 'developer';
-    const status: UserStatus = isFirstUser || isAdminUsername ? 'active' : 'pending';
+
+    // Determine status:
+    // - active if: first user, admin username, OR has access to allowed repos
+    // - pending otherwise (needs admin approval)
+    const shouldAutoActivate = isFirstUser || isAdminUsername || input.hasRepoAccess;
+    const status: UserStatus = shouldAutoActivate ? 'active' : 'pending';
 
     user = new this.userModel({
-      ...input,
+      githubId: input.githubId,
+      username: input.username,
+      displayName: input.displayName,
+      email: input.email,
+      avatarUrl: input.avatarUrl,
       role,
       status,
       lastLoginAt: new Date(),
@@ -78,7 +96,7 @@ export class UsersService {
 
     await user.save();
     this.logger.log(
-      `New user created: ${user.username} (role: ${role}, status: ${status})`,
+      `New user created: ${user.username} (role: ${role}, status: ${status}, hasRepoAccess: ${input.hasRepoAccess})`,
     );
 
     return user;

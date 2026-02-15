@@ -9,6 +9,7 @@ export interface GitHubProfile {
   email: string;
   avatarUrl: string;
   accessToken: string;
+  hasRepoAccess: boolean;
 }
 
 export interface SessionUser {
@@ -38,6 +39,7 @@ export class AuthService {
       displayName: profile.displayName,
       email: profile.email,
       avatarUrl: profile.avatarUrl,
+      hasRepoAccess: profile.hasRepoAccess,
     });
 
     // Check user status

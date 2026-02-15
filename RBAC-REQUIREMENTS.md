@@ -29,13 +29,28 @@ Implement user management and role-based access control for the AI Pipeline syst
 
 1. User clicks "Login with GitHub"
 2. GitHub OAuth validates user
-3. System checks if user exists in database:
-   - **New user**: Create with `pending` status (or `active` if they're an admin per env config)
+3. System checks repo access (using user's GitHub token):
+   - Checks membership in orgs listed in `ALLOWED_REPOS` (e.g., `mothership/`)
+   - Checks collaborator access to specific repos (e.g., `owner/repo`)
+4. System checks if user exists in database:
+   - **New user**: Create with appropriate status:
+     - `active` if: first user, admin username, OR has repo access
+     - `pending` if: no repo access (needs admin approval)
    - **Existing user**: Check status
      - `active` → Allow login
-     - `pending` → Show "Awaiting approval" message
+     - `pending` + has repo access → Auto-activate and allow login
+     - `pending` + no repo access → Show "Awaiting approval" message
      - `inactive` → Deny login
-4. Admin sees pending users in Admin panel and approves them
+5. Users without repo access wait for admin approval in Admin panel
+
+### Auto-Activation Rules
+
+A user is **automatically activated** if ANY of these are true:
+1. They are the first user to register
+2. Their username is in `ADMIN_GITHUB_USERNAMES`
+3. They have access to repos/orgs in `ALLOWED_REPOS`
+
+This means team members who already have GitHub access don't need manual approval.
 
 ## Data Model
 
