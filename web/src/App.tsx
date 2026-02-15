@@ -15,6 +15,8 @@ import { NewTask } from './pages/NewTask';
 import { TaskDetail } from './pages/TaskDetail';
 import { AdminUsers } from './pages/AdminUsers';
 import { Templates } from './pages/Templates';
+import { NotificationSettings } from './pages/NotificationSettings';
+import Stats from './pages/Stats';
 import { WebSocketProvider } from './context/WebSocketContext';
 import { ConnectionStatus } from './components/ConnectionStatus';
 
@@ -132,6 +134,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Templates />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/stats"
+          element={
+            <ProtectedRoute>
+              <Stats />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationSettings />
             </ProtectedRoute>
           }
         />

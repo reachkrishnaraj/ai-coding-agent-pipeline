@@ -5,6 +5,12 @@ import type { CreateTaskDto } from '../types';
 import { TemplateSelector } from '../components/TemplateSelector';
 import { TemplateVariableForm } from '../components/TemplateVariableForm';
 
+interface UserRepo {
+  id: string;
+  repoName: string;
+  defaultAgent?: string;
+}
+
 interface CloneFromData {
   description: string;
   type: string;
@@ -34,11 +40,12 @@ export function NewTask() {
   );
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [templateVariables, setTemplateVariables] = useState<Record<string, any>>({});
+  const [userRepos, setUserRepos] = useState<UserRepo[]>([]);
 
   const [formData, setFormData] = useState<CreateTaskDto>({
     description: cloneFrom?.description || '',
     type: cloneFrom?.type || '',
-    repo: cloneFrom?.repo || 'mothership/finance-service',
+    repo: cloneFrom?.repo || '',
     files: cloneFrom?.files || [],
     acceptanceCriteria: cloneFrom?.acceptanceCriteria || '',
     priority: cloneFrom?.priority || 'normal',
@@ -54,6 +61,11 @@ export function NewTask() {
   const [error, setError] = useState<string | null>(null);
   const isClone = !!cloneFrom;
 
+  // Load user repos on mount
+  useEffect(() => {
+    loadUserRepos();
+  }, []);
+
   // Load template from query param if present
   useEffect(() => {
     if (templateIdFromQuery && !selectedTemplate) {
@@ -67,6 +79,28 @@ export function NewTask() {
       window.history.replaceState({}, document.title);
     }
   }, [cloneFrom]);
+
+  const loadUserRepos = async () => {
+    try {
+      const response = await fetch('/api/repos', {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUserRepos(data.repos);
+        // Set default repo if not already set
+        if (!formData.repo && data.repos.length > 0) {
+          const lastRepo = localStorage.getItem('lastSelectedRepo');
+          const defaultRepo = lastRepo && lastRepo !== 'all'
+            ? data.repos.find((r: UserRepo) => r.repoName === lastRepo)?.repoName
+            : data.repos[0].repoName;
+          setFormData((prev) => ({ ...prev, repo: defaultRepo || data.repos[0].repoName }));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load repos:', error);
+    }
+  };
 
   const loadTemplate = async (templateId: string) => {
     try {
@@ -320,17 +354,34 @@ export function NewTask() {
               htmlFor="repo"
               className="block text-sm font-medium text-gray-700"
             >
-              Repository
+              Repository *
             </label>
-            <input
-              type="text"
+            <select
               id="repo"
+              required
               value={formData.repo}
               onChange={(e) =>
                 setFormData({ ...formData, repo: e.target.value })
               }
-              className="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border border-gray-300 rounded-md p-2"
-            />
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+            >
+              {userRepos.length === 0 && (
+                <option value="">No repositories available</option>
+              )}
+              {userRepos.map((repo) => (
+                <option key={repo.id} value={repo.repoName}>
+                  {repo.repoName}
+                  {repo.defaultAgent && ` (default: ${repo.defaultAgent})`}
+                </option>
+              ))}
+            </select>
+            {userRepos.length === 0 && (
+              <p className="mt-1 text-sm text-gray-500">
+                <a href="/repos/manage" className="text-indigo-600 hover:text-indigo-500">
+                  Add repositories
+                </a> to get started
+              </p>
+            )}
           </div>
 
           <div>

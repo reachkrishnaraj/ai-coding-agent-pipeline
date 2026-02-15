@@ -26,6 +26,18 @@ export function Navbar({ user }: NavbarProps) {
                 AI Pipeline
               </span>
             </Link>
+            <Link
+              to="/stats"
+              className="text-sm font-medium text-gray-500 hover:text-gray-700"
+            >
+              Stats
+            </Link>
+            <Link
+              to="/settings/notifications"
+              className="text-sm font-medium text-gray-500 hover:text-gray-700"
+            >
+              Notifications
+            </Link>
             {user?.role === 'admin' && (
               <Link
                 to="/admin/users"

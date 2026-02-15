@@ -23,6 +23,12 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     private configService: ConfigService,
   ) {}
 
+  // Public method to trigger stats computation manually
+  async computeStatsNow() {
+    await this.dailyAnalyticsJob({ attrs: { name: 'daily-analytics' } } as Job);
+    await this.weeklyAnalyticsJob({ attrs: { name: 'weekly-analytics' } } as Job);
+  }
+
   async onModuleInit() {
     const mongoUri = this.configService.get<string>('MONGODB_URI');
     const jobWorkersEnabled = this.configService.get<string>('JOB_WORKERS_ENABLED') !== 'false';

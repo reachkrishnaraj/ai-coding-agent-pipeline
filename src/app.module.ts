@@ -11,6 +11,9 @@ import { UsersModule } from './users/users.module';
 import { SlackModule } from './slack/slack.module';
 import { TemplatesModule } from './templates/templates.module';
 import { JobsModule } from './jobs/jobs.module';
+import { ReposModule } from './repos/repos.module';
+import { StatsModule } from './stats/stats.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -30,6 +33,9 @@ import { JobsModule } from './jobs/jobs.module';
     SlackModule,
     TemplatesModule,
     JobsModule,
+    ReposModule,
+    StatsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

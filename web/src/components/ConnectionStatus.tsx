@@ -1,4 +1,3 @@
-import React from 'react';
 import { useWebSocketContext } from '../context/WebSocketContext';
 
 /**
