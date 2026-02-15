@@ -1,25 +1,53 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../lib/api';
 import type { CreateTaskDto } from '../types';
 
+interface CloneFromData {
+  description: string;
+  type: string;
+  repo: string;
+  files: string[];
+  acceptanceCriteria: string;
+  priority: string;
+  recommended_agent: string;
+}
+
+interface LocationState {
+  cloneFrom?: CloneFromData;
+}
+
 export function NewTask() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state as LocationState | null;
+  const cloneFrom = state?.cloneFrom;
+
   const [formData, setFormData] = useState<CreateTaskDto>({
-    description: '',
-    type: '',
-    repo: 'mothership/finance-service',
-    files: [],
-    acceptanceCriteria: '',
-    priority: 'normal',
-    recommended_agent: '',
+    description: cloneFrom?.description || '',
+    type: cloneFrom?.type || '',
+    repo: cloneFrom?.repo || 'mothership/finance-service',
+    files: cloneFrom?.files || [],
+    acceptanceCriteria: cloneFrom?.acceptanceCriteria || '',
+    priority: cloneFrom?.priority || 'normal',
+    recommended_agent: cloneFrom?.recommended_agent || '',
   });
-  const [filesInput, setFilesInput] = useState('');
+  const [filesInput, setFilesInput] = useState(
+    cloneFrom?.files?.join(', ') || ''
+  );
   const [questions, setQuestions] = useState<string[]>([]);
   const [answers, setAnswers] = useState<string[]>([]);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isClone = !!cloneFrom;
+
+  // Clear location state after reading to prevent stale data on refresh
+  useEffect(() => {
+    if (cloneFrom) {
+      window.history.replaceState({}, document.title);
+    }
+  }, [cloneFrom]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,8 +148,14 @@ export function NewTask() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-white shadow sm:rounded-lg p-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">
-          Create New Task
+          {isClone ? 'Clone Task' : 'Create New Task'}
         </h1>
+        {isClone && (
+          <p className="text-sm text-gray-500 mb-4">
+            This form is pre-populated from an existing task. Edit as needed and
+            submit.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>

@@ -49,10 +49,23 @@ export class GitHubIssuesService {
   async createIssue(input: CreateIssueInput): Promise<CreateIssueResult> {
     const { taskId, source, description, analysis, clarificationQA } = input;
 
-    // SECURITY: Validate repo starts with "mothership/"
-    if (!analysis.repo.startsWith('mothership/')) {
+    // SECURITY: Validate repo against allowed list (comma-separated prefixes or exact matches)
+    // Example: ALLOWED_REPOS="mothership/,reachkrishnaraj/trade-app,myorg/"
+    const allowedReposConfig =
+      this.configService.get<string>('ALLOWED_REPOS') || 'mothership/';
+    const allowedRepos = allowedReposConfig
+      .split(',')
+      .map((r) => r.trim())
+      .filter((r) => r.length > 0);
+
+    const isAllowedRepo = allowedRepos.some(
+      (allowed) =>
+        analysis.repo === allowed || analysis.repo.startsWith(allowed),
+    );
+
+    if (!isAllowedRepo) {
       throw new BadRequestException(
-        `Invalid repository: ${analysis.repo}. Only mothership/* repositories are allowed.`,
+        `Invalid repository: ${analysis.repo}. Allowed: ${allowedRepos.join(', ')}`,
       );
     }
 
