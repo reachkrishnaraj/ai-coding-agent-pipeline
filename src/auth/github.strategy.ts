@@ -22,12 +22,14 @@ export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
     const clientSecret = configService.get<string>('GITHUB_OAUTH_CLIENT_SECRET');
 
     // Use placeholder values if not configured - strategy won't be usable but app will start
+    // Callback URL should go through frontend proxy in dev so session cookie works
+    const frontendUrl = configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
     super({
       clientID: clientID || 'not-configured',
       clientSecret: clientSecret || 'not-configured',
       callbackURL:
         configService.get<string>('GITHUB_OAUTH_CALLBACK_URL') ||
-        'http://localhost:3000/api/auth/github/callback',
+        `${frontendUrl}/api/auth/github/callback`,
       scope: ['read:user', 'read:org'],
     });
 
@@ -43,36 +45,42 @@ export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
     _refreshToken: string,
     profile: any,
   ): Promise<GitHubUser> {
-    // Verify user belongs to the mothership organization
-    const octokit = new Octokit({ auth: accessToken });
+    // Check if org restriction is configured
+    const requiredOrg = this.configService.get<string>('GITHUB_REQUIRED_ORG');
 
-    try {
-      const { data: orgs } = await octokit.rest.orgs.listForAuthenticatedUser();
-      const isMemberOfMothership = orgs.some(
-        (org) => org.login === 'mothership',
-      );
+    if (requiredOrg) {
+      // Verify user belongs to the required organization
+      const octokit = new Octokit({ auth: accessToken });
 
-      if (!isMemberOfMothership) {
+      try {
+        const { data: orgs } = await octokit.rest.orgs.listForAuthenticatedUser();
+        const isMemberOfOrg = orgs.some(
+          (org) => org.login === requiredOrg,
+        );
+
+        if (!isMemberOfOrg) {
+          throw new UnauthorizedException(
+            `You must be a member of the ${requiredOrg} organization`,
+          );
+        }
+      } catch (error) {
+        if (error instanceof UnauthorizedException) {
+          throw error;
+        }
         throw new UnauthorizedException(
-          'You must be a member of the mothership organization',
+          'Failed to verify organization membership',
         );
       }
-
-      return {
-        id: profile.id,
-        username: profile.username,
-        displayName: profile.displayName,
-        email: profile.emails?.[0]?.value || '',
-        avatarUrl: profile.photos?.[0]?.value || '',
-        accessToken,
-      };
-    } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
-      throw new UnauthorizedException(
-        'Failed to verify organization membership',
-      );
     }
+
+    // No org restriction or passed check - allow login
+    return {
+      id: profile.id,
+      username: profile.username,
+      displayName: profile.displayName,
+      email: profile.emails?.[0]?.value || '',
+      avatarUrl: profile.photos?.[0]?.value || '',
+      accessToken,
+    };
   }
 }

@@ -1,10 +1,15 @@
-import { Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Req, Res, UseGuards, Logger } from '@nestjs/common';
 import { AuthGuard as PassportAuthGuard } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import type { GitHubUser } from './github.strategy';
 
 @Controller('api/auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
+  constructor(private readonly configService: ConfigService) {}
+
   @Get('github')
   @UseGuards(PassportAuthGuard('github'))
   async githubLogin() {
@@ -14,12 +19,23 @@ export class AuthController {
   @Get('github/callback')
   @UseGuards(PassportAuthGuard('github'))
   async githubCallback(@Req() req: Request, @Res() res: Response) {
-    // Successful authentication, redirect to dashboard
-    res.redirect('/');
+    // Log successful authentication
+    const user = req.user as GitHubUser;
+    this.logger.log(`User authenticated: ${user?.username || 'unknown'}`);
+    this.logger.log(`Session ID: ${req.sessionID}`);
+    this.logger.log(`Session: ${JSON.stringify(req.session)}`);
+
+    // Successful authentication, redirect to frontend dashboard
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    res.redirect(frontendUrl);
   }
 
   @Get('me')
   async getMe(@Req() req: Request) {
+    this.logger.log(`/me called - Session ID: ${req.sessionID}`);
+    this.logger.log(`/me called - isAuthenticated: ${req.isAuthenticated()}`);
+    this.logger.log(`/me called - user: ${JSON.stringify(req.user)}`);
+
     if (!req.isAuthenticated()) {
       return { authenticated: false };
     }
