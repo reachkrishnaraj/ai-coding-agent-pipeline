@@ -512,7 +512,7 @@ export class NotificationsService {
     // Merge updates
     Object.assign(prefs, updates);
 
-    await prefs.save();
+    await (prefs as any).save();
     return prefs;
   }
 

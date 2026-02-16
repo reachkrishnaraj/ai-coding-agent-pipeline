@@ -9,10 +9,10 @@ import {
 } from '@nestjs/common';
 import { StatsService } from './stats.service';
 import { StatsQueryDto } from './dto/stats-query.dto';
-import { AuthenticatedGuard } from '../auth/guards/authenticated.guard';
+import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('api/stats')
-@UseGuards(AuthenticatedGuard)
+@UseGuards(AuthGuard)
 export class StatsController {
   private readonly logger = new Logger(StatsController.name);
 

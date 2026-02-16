@@ -55,6 +55,8 @@ describe('SlackWebhookController', () => {
     expect(controller).toBeDefined();
   });
 
+  const mockReq = { rawBody: Buffer.from('{}') } as any;
+
   describe('handleWebhook', () => {
     it('should handle URL verification challenge', async () => {
       const body = {
@@ -67,7 +69,7 @@ describe('SlackWebhookController', () => {
         .spyOn<any, any>(controller, 'verifySlackSignature')
         .mockReturnValue(true);
 
-      const result = await controller.handleWebhook(body, 'sig', '123');
+      const result = await controller.handleWebhook(mockReq, body, 'sig', '123');
 
       expect(result).toEqual({ challenge: 'test-challenge-123' });
     });
@@ -80,7 +82,7 @@ describe('SlackWebhookController', () => {
         .mockReturnValue(false);
 
       await expect(
-        controller.handleWebhook(body, 'invalid-sig', '123'),
+        controller.handleWebhook(mockReq, body, 'invalid-sig', '123'),
       ).rejects.toThrow(BadRequestException);
     });
   });

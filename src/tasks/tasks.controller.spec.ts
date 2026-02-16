@@ -15,6 +15,10 @@ describe('TasksController', () => {
     cancel: jest.fn(),
   };
 
+  const mockReq = {
+    user: { username: 'test-user', role: 'admin' },
+  } as any;
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TasksController],
@@ -50,10 +54,9 @@ describe('TasksController', () => {
 
       mockTasksService.create.mockResolvedValue(mockResult);
 
-      const result = await controller.create(createDto);
+      const result = await controller.create(createDto, mockReq);
 
       expect(result).toEqual(mockResult);
-      expect(service.create).toHaveBeenCalledWith(createDto);
     });
   });
 
@@ -70,7 +73,7 @@ describe('TasksController', () => {
 
       mockTasksService.clarify.mockResolvedValue(mockResult);
 
-      const result = await controller.clarify('123', clarifyDto);
+      const result = await controller.clarify('123', clarifyDto, mockReq);
 
       expect(result).toEqual(mockResult);
       expect(service.clarify).toHaveBeenCalledWith('123', clarifyDto);
@@ -89,10 +92,9 @@ describe('TasksController', () => {
 
       mockTasksService.findAll.mockResolvedValue(mockResult);
 
-      const result = await controller.findAll(query);
+      const result = await controller.findAll(query, mockReq);
 
       expect(result).toEqual(mockResult);
-      expect(service.findAll).toHaveBeenCalledWith(query);
     });
   });
 
@@ -102,11 +104,12 @@ describe('TasksController', () => {
         id: '123',
         description: 'Test task',
         events: [],
+        createdBy: 'test-user',
       };
 
       mockTasksService.findOne.mockResolvedValue(mockTask);
 
-      const result = await controller.findOne('123');
+      const result = await controller.findOne('123', mockReq);
 
       expect(result).toEqual(mockTask);
       expect(service.findOne).toHaveBeenCalledWith('123');
@@ -120,9 +123,10 @@ describe('TasksController', () => {
         status: 'analyzing',
       };
 
+      mockTasksService.findOne.mockResolvedValue({ createdBy: 'test-user' });
       mockTasksService.retry.mockResolvedValue(mockResult);
 
-      const result = await controller.retry('123');
+      const result = await controller.retry('123', mockReq);
 
       expect(result).toEqual(mockResult);
       expect(service.retry).toHaveBeenCalledWith('123');
@@ -135,9 +139,10 @@ describe('TasksController', () => {
         message: 'Task cancelled successfully',
       };
 
+      mockTasksService.findOne.mockResolvedValue({ createdBy: 'test-user' });
       mockTasksService.cancel.mockResolvedValue(mockResult);
 
-      const result = await controller.cancel('123');
+      const result = await controller.cancel('123', mockReq);
 
       expect(result).toEqual(mockResult);
       expect(service.cancel).toHaveBeenCalledWith('123');

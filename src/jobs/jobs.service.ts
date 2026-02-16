@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Connection } from 'mongoose';
@@ -8,6 +8,7 @@ import { JobHistory } from '../common/schemas/job-history.schema';
 import { AnalyticsDaily } from '../common/schemas/analytics-daily.schema';
 import { AnalyticsWeekly } from '../common/schemas/analytics-weekly.schema';
 import { TaskStatus } from '../common/enums/task-status.enum';
+import { RemindersService } from '../reminders/reminders.service';
 
 @Injectable()
 export class JobsService implements OnModuleInit, OnModuleDestroy {
@@ -21,6 +22,8 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     @InjectModel(AnalyticsDaily.name) private analyticsDailyModel: Model<AnalyticsDaily>,
     @InjectModel(AnalyticsWeekly.name) private analyticsWeeklyModel: Model<AnalyticsWeekly>,
     private configService: ConfigService,
+    @Inject(forwardRef(() => RemindersService))
+    private remindersService: RemindersService,
   ) {}
 
   // Public method to trigger stats computation manually
@@ -34,11 +37,10 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     const jobWorkersEnabled = this.configService.get<string>('JOB_WORKERS_ENABLED') !== 'false';
 
     this.agenda = new Agenda({
-      mongo: this.connection.db,
-      db: { collection: 'agenda_jobs' },
+      db: { address: mongoUri || '', collection: 'agenda_jobs' },
       processEvery: '30 seconds',
       maxConcurrency: 10,
-    });
+    } as any);
 
     // Define all jobs
     this.defineJobs();
@@ -94,6 +96,11 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     this.agenda.define('weekly-analytics', async (job: Job) => {
       await this.weeklyAnalyticsJob(job);
     }, { concurrency: 1 });
+
+    // Process Reminders Job
+    this.agenda.define('process-reminders', async (job: Job) => {
+      await this.processRemindersJobHandler(job);
+    }, { concurrency: 3 });
   }
 
   private setupEventListeners() {
@@ -190,13 +197,14 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       for (const task of staleTasks) {
         tasksProcessed++;
         try {
+          const taskUpdatedAt = (task as any).updatedAt as Date;
           // Log a warning event
           task.events.push({
             eventType: 'stale_task_detected',
             payload: {
               currentStatus: task.status,
-              lastUpdated: task.updatedAt,
-              staleForHours: Math.floor((Date.now() - task.updatedAt.getTime()) / (1000 * 60 * 60))
+              lastUpdated: taskUpdatedAt,
+              staleForHours: Math.floor((Date.now() - taskUpdatedAt.getTime()) / (1000 * 60 * 60))
             },
             createdAt: new Date(),
           });
@@ -358,10 +366,10 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       const tasksFailed = tasks.filter(t => t.status === TaskStatus.FAILED).length;
 
       // Calculate average time to merge
-      const mergedTasks = tasks.filter(t => t.completedAt && t.createdAt);
+      const mergedTasks = tasks.filter(t => t.completedAt && t.createdAt) as any[];
       const avgTimeToMerge = mergedTasks.length > 0
-        ? mergedTasks.reduce((sum, t) => {
-            const timeToMerge = (t.completedAt.getTime() - t.createdAt.getTime()) / (1000 * 60);
+        ? mergedTasks.reduce((sum: number, t: any) => {
+            const timeToMerge = (t.completedAt!.getTime() - t.createdAt.getTime()) / (1000 * 60);
             return sum + timeToMerge;
           }, 0) / mergedTasks.length
         : 0;
@@ -458,10 +466,10 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       const tasksFailed = tasks.filter(t => t.status === TaskStatus.FAILED).length;
 
       // Calculate average time to merge
-      const mergedTasks = tasks.filter(t => t.completedAt && t.createdAt);
+      const mergedTasks = tasks.filter(t => t.completedAt && t.createdAt) as any[];
       const avgTimeToMerge = mergedTasks.length > 0
-        ? mergedTasks.reduce((sum, t) => {
-            const timeToMerge = (t.completedAt.getTime() - t.createdAt.getTime()) / (1000 * 60);
+        ? mergedTasks.reduce((sum: number, t: any) => {
+            const timeToMerge = (t.completedAt!.getTime() - t.createdAt.getTime()) / (1000 * 60);
             return sum + timeToMerge;
           }, 0) / mergedTasks.length
         : 0;
@@ -547,6 +555,48 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
       });
 
       this.logger.log(`Weekly analytics completed: ${tasksCreated} tasks analyzed`);
+    } catch (error) {
+      const durationMs = Date.now() - startTime;
+      await this.recordJobFailure(job, error, durationMs);
+      throw error;
+    }
+  }
+
+  /**
+   * Process pending reminders
+   */
+  private async processRemindersJobHandler(job: Job) {
+    const startTime = Date.now();
+
+    try {
+      this.logger.log('Starting process reminders job');
+
+      const pendingReminders = await this.remindersService.findPending();
+
+      let processed = 0;
+      let sent = 0;
+      const errors: string[] = [];
+
+      for (const reminder of pendingReminders) {
+        processed++;
+        try {
+          await this.remindersService.sendReminder((reminder as any)._id.toString());
+          sent++;
+        } catch (error) {
+          errors.push(`Reminder ${(reminder as any)._id}: ${error.message}`);
+        }
+      }
+
+      const durationMs = Date.now() - startTime;
+
+      await this.recordJobSuccess(job, {
+        processed,
+        sent,
+        errors,
+        durationMs,
+      });
+
+      this.logger.log(`Process reminders completed: ${sent}/${processed} sent`);
     } catch (error) {
       const durationMs = Date.now() - startTime;
       await this.recordJobFailure(job, error, durationMs);

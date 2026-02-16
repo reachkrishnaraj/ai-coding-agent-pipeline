@@ -12,7 +12,7 @@ import {
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { NotificationsService } from './notifications.service';
 import { NotificationPreference } from '../common/schemas/notification-preference.schema';
 
@@ -147,7 +147,7 @@ export class NotificationsController {
   async unsubscribe(
     @Param('token') token: string,
     @Query('channel') channel?: 'email' | 'slack_dm' | 'slack_channel',
-    @Res() res?: Response,
+    @Res() res?: any,
   ) {
     const prefs = await this.notificationsService.unsubscribe(token, channel);
 
@@ -181,7 +181,7 @@ export class NotificationsController {
       </html>
     `;
 
-    res.status(HttpStatus.OK).send(html);
+    res!.status(HttpStatus.OK).send(html);
   }
 
   /**
@@ -192,7 +192,7 @@ export class NotificationsController {
   async resubscribe(
     @Param('token') token: string,
     @Query('channel') channel?: 'email' | 'slack_dm' | 'slack_channel',
-    @Res() res?: Response,
+    @Res() res?: any,
   ) {
     const prefs = await this.notificationsService.resubscribe(token, channel);
 
@@ -226,7 +226,7 @@ export class NotificationsController {
       </html>
     `;
 
-    res.status(HttpStatus.OK).send(html);
+    res!.status(HttpStatus.OK).send(html);
   }
 
   /**

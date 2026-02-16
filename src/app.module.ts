@@ -14,6 +14,8 @@ import { JobsModule } from './jobs/jobs.module';
 import { ReposModule } from './repos/repos.module';
 import { StatsModule } from './stats/stats.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { DependenciesModule } from './dependencies/dependencies.module';
+import { RemindersModule } from './reminders/reminders.module';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     ReposModule,
     StatsModule,
     NotificationsModule,
+    DependenciesModule,
+    RemindersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

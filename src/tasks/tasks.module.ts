@@ -7,11 +7,13 @@ import { TasksGateway } from './tasks.gateway';
 import { Task, TaskSchema } from '../common/schemas/task.schema';
 import { LlmServiceMock } from '../common/mocks/llm.service.mock';
 import { GitHubModule } from '../github/github.module';
+import { DependenciesModule } from '../dependencies/dependencies.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Task.name, schema: TaskSchema }]),
     GitHubModule,
+    forwardRef(() => DependenciesModule),
   ],
   controllers: [TasksController, HealthController],
   providers: [

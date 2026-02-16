@@ -40,7 +40,7 @@ export class StatsService {
 
     this.logger.debug(`Computing metrics for query: ${JSON.stringify(query)}`);
 
-    const { from, to, label } = this.getDateRange(query.timeRange, query.from, query.to);
+    const { from, to, label } = this.getDateRange(query.timeRange || TimeRange.SEVEN_DAYS, query.from, query.to);
     const filter = this.buildFilter(query, from, to);
 
     // Get all tasks for the period
@@ -126,7 +126,7 @@ export class StatsService {
       return cached as any;
     }
 
-    const { from, to } = this.getDateRange(query.timeRange, query.from, query.to);
+    const { from, to } = this.getDateRange(query.timeRange || TimeRange.SEVEN_DAYS, query.from, query.to);
 
     // Use pre-computed daily analytics if available
     const dailyAnalytics = await this.analyticsDailyModel
@@ -163,7 +163,7 @@ export class StatsService {
       return cached as any;
     }
 
-    const { from, to } = this.getDateRange(query.timeRange, query.from, query.to);
+    const { from, to } = this.getDateRange(query.timeRange || TimeRange.SEVEN_DAYS, query.from, query.to);
     const filter = this.buildFilter(query, from, to);
 
     const tasks = await this.taskModel.find(filter).exec();
@@ -175,7 +175,7 @@ export class StatsService {
       if (!agentGroups.has(agent)) {
         agentGroups.set(agent, []);
       }
-      agentGroups.get(agent).push(task as Task);
+      agentGroups.get(agent)!.push(task as Task);
     });
 
     const agents: AgentPerformance[] = [];
@@ -195,7 +195,7 @@ export class StatsService {
         if (!typeGroups.has(type)) {
           typeGroups.set(type, []);
         }
-        typeGroups.get(type).push(task);
+        typeGroups.get(type)!.push(task);
       });
 
       for (const [type, typeTasks] of typeGroups.entries()) {
@@ -240,7 +240,7 @@ export class StatsService {
     page: number = 1,
     limit: number = 20
   ): Promise<{ users: UserActivity[]; pagination: any; period: any }> {
-    const { from, to } = this.getDateRange(query.timeRange, query.from, query.to);
+    const { from, to } = this.getDateRange(query.timeRange || TimeRange.SEVEN_DAYS, query.from, query.to);
     const filter = this.buildFilter(query, from, to);
     filter.createdBy = { $exists: true, $ne: null };
 
@@ -253,7 +253,7 @@ export class StatsService {
       if (!userGroups.has(userId)) {
         userGroups.set(userId, []);
       }
-      userGroups.get(userId).push(task as Task);
+      userGroups.get(userId)!.push(task as Task);
     });
 
     const users: UserActivity[] = [];
@@ -311,7 +311,7 @@ export class StatsService {
     page: number = 1,
     limit: number = 10
   ): Promise<{ failures: TaskFailure[]; pagination: any }> {
-    const { from, to } = this.getDateRange(query.timeRange, query.from, query.to);
+    const { from, to } = this.getDateRange(query.timeRange || TimeRange.SEVEN_DAYS, query.from, query.to);
     const filter = this.buildFilter(query, from, to);
     filter.status = TaskStatus.FAILED;
 

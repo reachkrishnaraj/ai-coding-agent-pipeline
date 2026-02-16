@@ -88,7 +88,7 @@ export class JobsController {
     const agenda = this.jobsService.getAgenda();
 
     // Get job counts by status
-    const jobs = await agenda.jobs({});
+    const jobs = await (agenda as any).jobs({});
 
     const statusCounts = {
       active: 0,
@@ -122,7 +122,7 @@ export class JobsController {
 
     const queues = await Promise.all(
       definitions.map(async (name) => {
-        const jobsForName = await agenda.jobs({ name });
+        const jobsForName = await (agenda as any).jobs({ name });
         const nextRun = jobsForName.find(j => j.attrs.nextRunAt);
 
         return {

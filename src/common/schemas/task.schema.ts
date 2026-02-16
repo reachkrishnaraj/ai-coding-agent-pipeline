@@ -6,6 +6,9 @@ export type TaskDocument = Task & Document;
 
 @Schema({ timestamps: true, collection: 'tasks' })
 export class Task {
+  // Mongoose timestamps
+  createdAt: Date;
+  updatedAt: Date;
   // Source
   @Prop({ required: true })
   source: string; // 'web' | 'slack' | 'api' | 'asana'
@@ -123,6 +126,53 @@ export class Task {
   @Prop({ default: false })
   analyticsExclude?: boolean;
 
+  // Task Dependencies
+  @Prop({
+    type: [
+      {
+        id: String,
+        type: { type: String, enum: ['task', 'pr', 'external_issue'] },
+        taskId: String,
+        repo: String,
+        prNumber: Number,
+        externalRepo: String,
+        externalIssueNumber: Number,
+        requiredStatus: String,
+        blockingBehavior: { type: String, enum: ['hard', 'soft'], default: 'hard' },
+        currentState: { type: String, enum: ['pending', 'ready', 'blocked', 'resolved', 'failed'], default: 'pending' },
+        resolvedAt: Date,
+        failureReason: String,
+      },
+    ],
+    default: [],
+  })
+  dependencies: Array<{
+    id: string;
+    type: 'task' | 'pr' | 'external_issue';
+    taskId?: string;
+    repo?: string;
+    prNumber?: number;
+    externalRepo?: string;
+    externalIssueNumber?: number;
+    requiredStatus: string;
+    blockingBehavior: 'hard' | 'soft';
+    currentState: 'pending' | 'ready' | 'blocked' | 'resolved' | 'failed';
+    resolvedAt?: Date;
+    failureReason?: string;
+  }>;
+
+  @Prop({ default: 'pending' })
+  dependencyStatus: 'pending' | 'ready' | 'blocked';
+
+  @Prop({ type: [String], default: [] })
+  blockedBy: string[];
+
+  @Prop({ default: false })
+  autoStartOnDependency: boolean;
+
+  @Prop()
+  dependencyResolvedAt?: Date;
+
   // Embedded events (denormalized for fast reads)
   @Prop({
     type: [
@@ -148,6 +198,10 @@ TaskSchema.index({ repo: 1 });
 TaskSchema.index({ createdAt: -1 });
 TaskSchema.index({ githubIssueNumber: 1 }, { sparse: true });
 TaskSchema.index({ slackThreadTs: 1 }, { sparse: true });
+TaskSchema.index({ 'dependencies.taskId': 1 }, { sparse: true });
+TaskSchema.index({ 'dependencies.prNumber': 1 }, { sparse: true });
+TaskSchema.index({ 'dependencies.externalIssueNumber': 1 }, { sparse: true });
+TaskSchema.index({ dependencyStatus: 1 });
 
 // Virtual for id
 TaskSchema.set('toJSON', {

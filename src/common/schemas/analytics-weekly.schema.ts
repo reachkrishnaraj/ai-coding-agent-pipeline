@@ -27,13 +27,7 @@ export class AnalyticsWeekly {
   avgLlmAnalysisTime: number; // in seconds
 
   @Prop({ type: Object, default: {} })
-  taskTypeBreakdown: {
-    'bug-fix'?: number;
-    'feature'?: number;
-    'refactor'?: number;
-    'test-coverage'?: number;
-    [key: string]: number;
-  };
+  taskTypeBreakdown: Record<string, number>;
 
   @Prop({ type: Object, default: {} })
   repoBreakdown: {

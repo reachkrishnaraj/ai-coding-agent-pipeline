@@ -141,7 +141,7 @@ describe('JobsController', () => {
 
       expect(result.success).toBe(true);
       expect(result.job).toBeDefined();
-      expect(result.job.id).toBe('123');
+      expect(result.job!.id).toBe('123');
       expect(mockJobsService.getJobById).toHaveBeenCalledWith('123');
     });
 

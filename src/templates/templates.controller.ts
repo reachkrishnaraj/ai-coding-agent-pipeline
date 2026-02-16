@@ -17,10 +17,10 @@ import { CreateTemplateDto } from './dto/create-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
 import { ApplyTemplateDto } from './dto/apply-template.dto';
 import { TemplateQueryDto } from './dto/template-query.dto';
-import { AuthenticatedGuard } from '../auth/auth.guard';
+import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('api/templates')
-@UseGuards(AuthenticatedGuard)
+@UseGuards(AuthGuard)
 export class TemplatesController {
   constructor(private readonly templatesService: TemplatesService) {}
 
