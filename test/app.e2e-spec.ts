@@ -830,7 +830,7 @@ describe('ReposController (e2e)', () => {
           { provide: ReposService, useValue: mockReposServiceImpl },
         ],
       })
-        .overrideGuard(PassportAuthGuard('session'))
+        .overrideGuard(AuthGuard)
         .useClass(MockAuthGuardAllow)
         .compile();
 
@@ -961,7 +961,7 @@ describe('ReposController (e2e)', () => {
           { provide: ReposService, useValue: mockReposServiceImpl },
         ],
       })
-        .overrideGuard(PassportAuthGuard('session'))
+        .overrideGuard(AuthGuard)
         .useClass(MockAuthGuardDeny)
         .compile();
 

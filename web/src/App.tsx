@@ -17,6 +17,7 @@ import { AdminUsers } from './pages/AdminUsers';
 import { Templates } from './pages/Templates';
 import { NotificationSettings } from './pages/NotificationSettings';
 import Stats from './pages/Stats';
+import { RepoManage } from './pages/RepoManage';
 import { WebSocketProvider } from './context/WebSocketContext';
 import { ConnectionStatus } from './components/ConnectionStatus';
 
@@ -150,6 +151,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <NotificationSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/repos/manage"
+          element={
+            <ProtectedRoute>
+              <RepoManage />
             </ProtectedRoute>
           }
         />

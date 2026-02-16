@@ -14,10 +14,10 @@ import {
 import { ReposService } from './repos.service';
 import { AddRepoDto } from './dto/add-repo.dto';
 import { UpdateRepoSettingsDto } from './dto/update-repo-settings.dto';
-import { AuthGuard } from '@nestjs/passport';
+import { AuthGuard } from '../auth/auth.guard';
 
 @Controller('api/repos')
-@UseGuards(AuthGuard('session'))
+@UseGuards(AuthGuard)
 export class ReposController {
   constructor(private readonly reposService: ReposService) {}
 

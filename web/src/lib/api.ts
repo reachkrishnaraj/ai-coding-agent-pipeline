@@ -131,6 +131,37 @@ export const api = {
       }),
   },
 
+  repos: {
+    list: (includeStats = false) =>
+      fetchAPI<{ repos: any[]; total: number }>(
+        `/repos${includeStats ? '?includeStats=true' : ''}`,
+      ),
+
+    available: () =>
+      fetchAPI<{ repos: any[]; total: number }>('/repos/available'),
+
+    add: (repoName: string, defaultAgent?: string) =>
+      fetchAPI<any>('/repos', {
+        method: 'POST',
+        body: JSON.stringify({ repoName, defaultAgent }),
+      }),
+
+    remove: (id: string) =>
+      fetchAPI<any>(`/repos/${id}`, {
+        method: 'DELETE',
+      }),
+
+    getSettings: (id: string) => fetchAPI<any>(`/repos/${id}/settings`),
+
+    updateSettings: (id: string, data: { defaultAgent?: string; customSystemPrompt?: string }) =>
+      fetchAPI<any>(`/repos/${id}/settings`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+
+    getStats: (id: string) => fetchAPI<any>(`/repos/${id}/stats`),
+  },
+
   templates: {
     list: (params?: {
       type?: string;
