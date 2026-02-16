@@ -10,10 +10,10 @@ interface Repo {
 }
 
 interface AvailableRepo {
-  full_name: string;
+  fullName: string;
   description?: string;
   private: boolean;
-  html_url: string;
+  htmlUrl: string;
 }
 
 export function RepoManage() {
@@ -217,12 +217,12 @@ export function RepoManage() {
                 <div className="space-y-2">
                   {availableRepos.map((repo) => (
                     <div
-                      key={repo.full_name}
+                      key={repo.fullName}
                       className="flex items-center justify-between p-3 border border-gray-200 rounded-md hover:bg-gray-50"
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm truncate">{repo.full_name}</span>
+                          <span className="font-medium text-sm truncate">{repo.fullName}</span>
                           {repo.private && (
                             <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded">
                               private
@@ -233,11 +233,11 @@ export function RepoManage() {
                           <p className="text-xs text-gray-500 mt-0.5 truncate">{repo.description}</p>
                         )}
                       </div>
-                      {addedRepoNames.has(repo.full_name) ? (
+                      {addedRepoNames.has(repo.fullName) ? (
                         <span className="text-xs text-gray-400 ml-2">Added</span>
                       ) : (
                         <button
-                          onClick={() => handleAddRepo(repo.full_name)}
+                          onClick={() => handleAddRepo(repo.fullName)}
                           className="ml-2 px-3 py-1 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-700 shrink-0"
                         >
                           Add
