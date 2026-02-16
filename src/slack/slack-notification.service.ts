@@ -20,7 +20,7 @@ export class SlackNotificationService {
     try {
       const task = await this.taskModel.findById(taskId).exec();
 
-      if (!task || !task.slackUserId) {
+      if (!task) {
         return;
       }
 
@@ -37,7 +37,7 @@ export class SlackNotificationService {
     try {
       const task = await this.taskModel.findById(taskId).exec();
 
-      if (!task || !task.slackUserId) {
+      if (!task) {
         return;
       }
 
@@ -54,7 +54,7 @@ export class SlackNotificationService {
     try {
       const task = await this.taskModel.findById(taskId).exec();
 
-      if (!task || !task.slackUserId) {
+      if (!task) {
         return;
       }
 
@@ -71,7 +71,7 @@ export class SlackNotificationService {
     try {
       const task = await this.taskModel.findById(taskId).exec();
 
-      if (!task || !task.slackUserId) {
+      if (!task) {
         return;
       }
 
@@ -88,7 +88,7 @@ export class SlackNotificationService {
     try {
       const task = await this.taskModel.findById(taskId).exec();
 
-      if (!task || !task.slackUserId) {
+      if (!task) {
         return;
       }
 
