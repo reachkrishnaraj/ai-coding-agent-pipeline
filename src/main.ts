@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import session = require('express-session');
 import passport = require('passport');
 import { json, urlencoded } from 'express';
@@ -29,6 +30,9 @@ async function bootstrap() {
       },
     }),
   );
+
+  // Enable WebSocket adapter for real-time task updates
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   // Enable CORS for frontend
   app.enableCors({
