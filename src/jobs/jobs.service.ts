@@ -36,26 +36,36 @@ export class JobsService implements OnModuleInit, OnModuleDestroy {
     const mongoUri = this.configService.get<string>('MONGODB_URI');
     const jobWorkersEnabled = this.configService.get<string>('JOB_WORKERS_ENABLED') !== 'false';
 
-    this.agenda = new Agenda({
-      db: { address: mongoUri || '', collection: 'agenda_jobs' },
-      processEvery: '30 seconds',
-      maxConcurrency: 10,
-    } as any);
+    if (!mongoUri) {
+      this.logger.warn('MONGODB_URI not set — skipping Agenda initialization');
+      return;
+    }
 
-    // Define all jobs
-    this.defineJobs();
+    try {
+      this.agenda = new Agenda({
+        db: { address: mongoUri, collection: 'agenda_jobs' },
+        processEvery: '30 seconds',
+        maxConcurrency: 10,
+      } as any);
 
-    // Set up event listeners
-    this.setupEventListeners();
+      // Define all jobs
+      this.defineJobs();
 
-    await this.agenda.start();
-    this.logger.log('Agenda started successfully');
+      // Set up event listeners
+      this.setupEventListeners();
 
-    if (jobWorkersEnabled) {
-      await this.scheduleAllJobs();
-      this.logger.log('All jobs scheduled successfully');
-    } else {
-      this.logger.log('Job workers disabled via config');
+      await this.agenda.start();
+      this.logger.log('Agenda started successfully');
+
+      if (jobWorkersEnabled) {
+        await this.scheduleAllJobs();
+        this.logger.log('All jobs scheduled successfully');
+      } else {
+        this.logger.log('Job workers disabled via config');
+      }
+    } catch (error) {
+      this.logger.error(`Failed to initialize Agenda: ${error.message}`);
+      this.logger.warn('Job scheduler will be unavailable');
     }
   }
 
