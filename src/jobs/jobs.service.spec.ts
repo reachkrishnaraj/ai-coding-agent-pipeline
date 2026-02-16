@@ -7,6 +7,7 @@ import { JobHistory } from '../common/schemas/job-history.schema';
 import { AnalyticsDaily } from '../common/schemas/analytics-daily.schema';
 import { AnalyticsWeekly } from '../common/schemas/analytics-weekly.schema';
 import { TaskStatus } from '../common/enums/task-status.enum';
+import { RemindersService } from '../reminders/reminders.service';
 
 // Mock the agenda module
 jest.mock('agenda', () => {
@@ -95,6 +96,13 @@ describe('JobsService', () => {
               if (key === 'JOB_WORKERS_ENABLED') return 'false';
               return null;
             }),
+          },
+        },
+        {
+          provide: RemindersService,
+          useValue: {
+            findPending: jest.fn().mockResolvedValue([]),
+            sendReminder: jest.fn().mockResolvedValue(undefined),
           },
         },
       ],

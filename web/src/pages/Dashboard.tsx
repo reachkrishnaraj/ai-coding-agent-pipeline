@@ -91,7 +91,7 @@ export function Dashboard() {
       console.log('[Dashboard] Task list updated:', payload);
 
       setTasks((prevTasks) => {
-        const index = prevTasks.findIndex((t) => t._id === payload.taskId);
+        const index = prevTasks.findIndex((t) => t.id === payload.taskId);
 
         if (index !== -1) {
           // Update existing task

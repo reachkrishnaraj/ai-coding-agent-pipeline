@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { api } from '../lib/api';
 
 interface Task {
   id: string;
